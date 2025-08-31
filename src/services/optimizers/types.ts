@@ -1,5 +1,5 @@
 // Shared types for AI optimization system
-import type { Workflow, Node, Edge } from '@auterity/workflow-contracts';
+import type { Workflow, Node, Edge } from '../../types/workflow-contracts';
 
 export interface OptimizationConfig {
   strategy: 'performance' | 'cost' | 'balanced' | 'quality';

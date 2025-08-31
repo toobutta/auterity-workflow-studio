@@ -1,6 +1,6 @@
 // Workflow Optimizer - Performance optimization algorithms
 import { logger } from '../../../../auterity-error-iq/shared/utils/logger.js';
-import type { Workflow, Node, Edge } from '@auterity/workflow-contracts';
+import type { Workflow, Node, Edge } from '../../types/workflow-contracts';
 import type { OptimizationConfig, OptimizationResult, PerformanceMetrics } from './types.js';
 
 export interface ExecutionPlan {

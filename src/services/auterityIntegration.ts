@@ -1,5 +1,5 @@
 import { unifiedApiClient, UnifiedAPIClient } from '../../../auterity-error-iq/shared/services/unified-api-client/index.js';
-import { WorkflowSchema, type Workflow, type Node, type Edge } from '@auterity/workflow-contracts';
+import { WorkflowSchema, type Workflow, type Node, type Edge } from '../types/workflow-contracts';
 import { logger } from '../../../auterity-error-iq/shared/utils/logger.js';
 import { retryWithBackoff } from '../../../auterity-error-iq/shared/utils/retryUtils.js';
 

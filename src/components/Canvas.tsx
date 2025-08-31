@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Application, Graphics } from 'pixi.js';
-import type { Workflow } from '@auterity/workflow-contracts';
+import type { Workflow } from '../types/workflow-contracts';
 
 export function Canvas({ workflow }: { workflow: Workflow }) {
   const ref = useRef<HTMLDivElement|null>(null);
