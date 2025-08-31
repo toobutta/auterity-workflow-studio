@@ -1,6 +1,6 @@
 // Performance Monitor - Real-time performance tracking and analytics
 import { logger } from '../../../../auterity-error-iq/shared/utils/logger.js';
-import type { Workflow, Node } from '@auterity/workflow-contracts';
+import type { Workflow, Node } from '../../types/workflow-contracts';
 import type { PerformanceMetrics, OptimizationConfig } from './types.js';
 
 export interface PerformanceSnapshot {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { WorkflowSchema } from '@auterity/workflow-contracts';
+import { WorkflowSchema } from '../types/workflow-contracts';
 import { getCanonical } from '../services/api.js';
 
 export function useCanonical() {

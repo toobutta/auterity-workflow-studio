@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WorkflowSchema, reactflowToCanonical, canonicalToReactflow } from '@auterity/workflow-contracts'
+import { WorkflowSchema, reactflowToCanonical, canonicalToReactflow } from '../types/workflow-contracts'
 
 describe('Contracts Integration', () => {
   const sampleWorkflow = {
