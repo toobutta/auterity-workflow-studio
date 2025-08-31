@@ -4,6 +4,18 @@ import { FileMenu } from './FileMenu.js';
 import { fileManagementService } from '../../services/fileManagementService.js';
 import { ToolBrowser } from '../ToolBrowser.js';
 import { toolNodeFactory } from '../../utils/toolIntegration.js';
+import {
+  CursorArrowRaysIcon,
+  HandRaisedIcon,
+  LinkIcon,
+  WrenchScrewdriverIcon,
+  Squares2X2Icon,
+  MapPinIcon,
+  MinusIcon,
+  PlusIcon,
+  ViewfinderCircleIcon,
+  BugAntIcon
+} from '@heroicons/react/24/outline';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -140,7 +152,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.setActiveTool('select')}
           title="Select Tool (Space to toggle)"
         >
-          <span className="tool-icon">🔍</span>
+          <CursorArrowRaysIcon className="w-4 h-4" />
           <span className="tool-label">Select</span>
         </button>
 
@@ -149,7 +161,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.setActiveTool('pan')}
           title="Pan Tool (Space to toggle)"
         >
-          <span className="tool-icon">✋</span>
+          <HandRaisedIcon className="w-4 h-4" />
           <span className="tool-label">Pan</span>
         </button>
 
@@ -158,7 +170,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.setActiveTool('connection-create')}
           title="Connection Tool (Ctrl+C)"
         >
-          <span className="tool-icon">🔗</span>
+          <LinkIcon className="w-4 h-4" />
           <span className="tool-label">Connect</span>
         </button>
 
@@ -167,7 +179,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => setIsToolBrowserOpen(true)}
           title="Tool Library (Add external tools and integrations)"
         >
-          <span className="tool-icon">🛠️</span>
+          <WrenchScrewdriverIcon className="w-4 h-4" />
           <span className="tool-label">Tools</span>
         </button>
       </div>
@@ -181,7 +193,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={actions.toggleGrid}
           title="Toggle Grid (Ctrl+G)"
         >
-          <span className="tool-icon">⊞</span>
+          <Squares2X2Icon className="w-4 h-4" />
           <span className="tool-label">Grid</span>
         </button>
 
@@ -190,7 +202,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={actions.toggleSnapToGrid}
           title="Snap to Grid (Ctrl+S)"
         >
-          <span className="tool-icon">📌</span>
+          <MapPinIcon className="w-4 h-4" />
           <span className="tool-label">Snap</span>
         </button>
       </div>
@@ -204,7 +216,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.updateViewport({ zoom: canvas.viewport.zoom / 1.2 })}
           title="Zoom Out (-)"
         >
-          <span className="tool-icon">➖</span>
+          <MinusIcon className="w-4 h-4" />
           <span className="tool-label">Out</span>
         </button>
 
@@ -217,7 +229,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.updateViewport({ zoom: canvas.viewport.zoom * 1.2 })}
           title="Zoom In (+)"
         >
-          <span className="tool-icon">➕</span>
+          <PlusIcon className="w-4 h-4" />
           <span className="tool-label">In</span>
         </button>
 
@@ -226,7 +238,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.updateViewport({ x: 0, y: 0, zoom: 1 })}
           title="Fit to Screen (0)"
         >
-          <span className="tool-icon">🎯</span>
+          <ViewfinderCircleIcon className="w-4 h-4" />
           <span className="tool-label">Fit</span>
         </button>
       </div>
@@ -240,7 +252,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
           onClick={() => actions.togglePanel('debug')}
           title="Toggle Debug Panel"
         >
-          <span className="tool-icon">🐛</span>
+          <BugAntIcon className="w-4 h-4" />
           <span className="tool-label">Debug</span>
         </button>
       </div>

@@ -3,6 +3,49 @@ import { authService } from './authService';
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5055';
 const API_KEY = import.meta.env.VITE_API_KEY ?? 'dev-api-key-123'; // Fallback for development
 
+/**
+ * Standardized API response interface
+ */
+export interface ApiResponse<T = unknown> {
+  data: T;
+  status: number;
+  message?: string;
+}
+
+/**
+ * Standardized API error interface
+ */
+export interface ApiError {
+  message: string;
+  status: number;
+  details?: unknown;
+}
+
+/**
+ * Custom API error class
+ */
+export class ApiErrorClass extends Error implements ApiError {
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, status: number, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
+}
+
+/**
+ * Request configuration interface
+ */
+export interface RequestConfig {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: unknown;
+  params?: Record<string, string>;
+}
+
 class ApiClient {
   private async getHeaders(includeAuth = true): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
@@ -44,10 +87,83 @@ class ApiClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error ${response.status}: ${errorText}`);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      throw new ApiErrorClass(
+        errorData.message || `HTTP ${response.status}`,
+        response.status,
+        errorData
+      );
     }
 
     return response.json();
+  }
+
+  /**
+   * Standardized request method with enhanced error handling
+   */
+  private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
+    const url = new URL(endpoint, API_BASE);
+
+    if (config.params) {
+      Object.entries(config.params).forEach(([key, value]) => {
+        url.searchParams.append(key, value);
+      });
+    }
+
+    const requestOptions: RequestInit = {
+      method: config.method || 'GET',
+      headers: await this.getHeaders(config.method !== 'GET'),
+    };
+
+    if (config.body && config.method !== 'GET') {
+      if (config.body instanceof FormData) {
+        // For FormData, remove Content-Type header to let browser set it with boundary
+        const headers = { ...(requestOptions.headers as Record<string, string>) };
+        delete headers['Content-Type'];
+        requestOptions.headers = headers;
+        requestOptions.body = config.body;
+      } else {
+        requestOptions.body = JSON.stringify(config.body);
+      }
+    }
+
+    // Override headers if provided
+    if (config.headers) {
+      requestOptions.headers = { ...(requestOptions.headers as Record<string, string>), ...config.headers };
+    }
+
+    try {
+      const response = await fetch(url.toString(), requestOptions);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new ApiErrorClass(
+          errorData.message || `HTTP ${response.status}`,
+          response.status,
+          errorData
+        );
+      }
+
+      const data = await response.json();
+      return {
+        data,
+        status: response.status,
+        message: response.statusText,
+      };
+    } catch (error) {
+      if (error instanceof ApiErrorClass) {
+        throw error;
+      }
+      throw new ApiErrorClass(
+        error instanceof Error ? error.message : 'Network error',
+        0
+      );
+    }
   }
 
   async getWorkflow(id: string) {
@@ -145,6 +261,77 @@ class ApiClient {
     } else {
       return response.blob();
     }
+  }
+
+  /**
+   * Standardized GET request
+   */
+  async get<T>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: 'GET' });
+  }
+
+  /**
+   * Standardized POST request
+   */
+  async post<T>(endpoint: string, body?: unknown, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: 'POST', body });
+  }
+
+  /**
+   * Standardized PUT request
+   */
+  async put<T>(endpoint: string, body?: unknown, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: 'PUT', body });
+  }
+
+  /**
+   * Standardized DELETE request
+   */
+  async delete<T>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
+  }
+
+  /**
+   * File upload with progress tracking
+   */
+  async uploadFile<T>(endpoint: string, file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<T>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // For file uploads, we'll use the legacy makeRequest method but with better error handling
+    const url = `${API_BASE}${endpoint}`;
+    const headers = await this.getHeaders(true);
+    // Remove Content-Type for FormData
+    const uploadHeaders = { ...headers };
+    delete uploadHeaders['Content-Type'];
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: uploadHeaders,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      throw new ApiErrorClass(
+        errorData.message || `HTTP ${response.status}`,
+        response.status,
+        errorData
+      );
+    }
+
+    const data = await response.json();
+    return {
+      data,
+      status: response.status,
+      message: response.statusText,
+    };
   }
 
   // AI Hub integration methods

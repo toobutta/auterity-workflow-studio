@@ -43,9 +43,103 @@ const EnhancedCanvasContent: React.FC = React.memo(() => {
 
   const [performanceStats, setPerformanceStats] = useState({ fps: 60, memory: 0 });
 
+  // Undo/Redo system
+  const [undoStack, setUndoStack] = useState<any[]>([]);
+  const [redoStack, setRedoStack] = useState<any[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Animation control for accessibility
+  const [animationsPaused, setAnimationsPaused] = useState(false);
+
   // Use Zustand store
   const { state, actions } = useStudioStore();
   const { canvas, nodes, connections, selection, theme } = state;
+
+  // Undo/Redo functions
+  const saveState = useCallback(() => {
+    const currentState = {
+      nodes: Array.from(nodes.entries()),
+      connections: Array.from(connections.entries()),
+      canvas: { ...canvas },
+      timestamp: Date.now()
+    };
+
+    setUndoStack(prev => [...prev, currentState].slice(-50)); // Keep last 50 states
+    setRedoStack([]); // Clear redo stack when new action is performed
+    setCanUndo(true);
+    setCanRedo(false);
+  }, [nodes, connections, canvas]);
+
+  const undo = useCallback(() => {
+    if (undoStack.length === 0) return;
+
+    const currentState = {
+      nodes: Array.from(nodes.entries()),
+      connections: Array.from(connections.entries()),
+      canvas: { ...canvas }
+    };
+
+    const previousState = undoStack[undoStack.length - 1];
+    const newUndoStack = undoStack.slice(0, -1);
+
+    // Restore previous state (skip saveState to avoid infinite loop)
+    previousState.nodes.forEach(([id, node]: [string, any]) => {
+      if (node) actions.updateNode(id, node);
+    });
+
+    previousState.connections.forEach(([id, connection]: [string, any]) => {
+      if (connection) actions.updateConnection(id, connection);
+    });
+
+    actions.updateCanvas(previousState.canvas);
+
+    setUndoStack(newUndoStack);
+    setRedoStack(prev => [...prev, currentState]);
+    setCanUndo(newUndoStack.length > 0);
+    setCanRedo(true);
+  }, [undoStack, nodes, connections, canvas, actions]);
+
+  const redo = useCallback(() => {
+    if (redoStack.length === 0) return;
+
+    const nextState = redoStack[redoStack.length - 1];
+    const newRedoStack = redoStack.slice(0, -1);
+
+    // Restore next state
+    nextState.nodes.forEach(([id, node]: [string, any]) => {
+      if (node) actions.updateNode(id, node);
+    });
+
+    nextState.connections.forEach(([id, connection]: [string, any]) => {
+      if (connection) actions.updateConnection(id, connection);
+    });
+
+    actions.updateCanvas(nextState.canvas);
+
+    setRedoStack(newRedoStack);
+    setUndoStack(prev => [...prev, nextState]);
+    setCanRedo(newRedoStack.length > 0);
+    setCanUndo(true);
+  }, [redoStack, actions]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          undo();
+        } else if ((event.key === 'y') || (event.key === 'z' && event.shiftKey)) {
+          event.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Memoized expensive calculations
   const processedNodes = useMemo(() => {
@@ -221,45 +315,8 @@ const EnhancedCanvasContent: React.FC = React.memo(() => {
     }
   }, [canvas.config, canvas.viewport]);
 
-  // Render nodes with object pooling
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const container = containerRef.current;
-    const nodeLayer = container.children.find(child => child.name === 'nodeLayer') as Container;
-    if (!nodeLayer) return;
-
-    // Clear existing nodes
-    nodeLayer.removeChildren();
-
-    // Performance tracking
-    const startTime = performance.now();
-    let visibleNodeCount = 0;
-
-    // Render only visible nodes using object pool
-    processedNodes.forEach(nodeData => {
-      // Skip off-screen nodes for better performance
-      if (!nodeData.isVisible) return;
-      
-      visibleNodeCount++;
-      const graphics = graphicsPoolRef.current.get();
-      renderNode(graphics, nodeData);
-      nodeLayer.addChild(graphics);
-    });
-
-    const renderTime = performance.now() - startTime;
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`Rendered ${visibleNodeCount}/${processedNodes.length} nodes in ${renderTime.toFixed(2)}ms`);
-    }
-
-    // Return graphics to pool after a delay to prevent flickering
-    setTimeout(() => {
-      // This would be handled by a more sophisticated pooling system
-    }, 100);
-  }, [processedNodes, renderNode]);
-
-  // Optimized node rendering
-  const renderNode = useCallback((graphics: Graphics, node: StudioNode) => {
+  // Optimized node rendering function
+  const renderNode = useCallback((graphics: Graphics, node: StudioNode): void => {
     graphics.clear();
     graphics.position.set(node.position.x, node.position.y);
 
@@ -294,6 +351,43 @@ const EnhancedCanvasContent: React.FC = React.memo(() => {
     text.position.set(node.size.width / 2, node.size.height / 2);
     graphics.addChild(text);
   }, [selection.selectedNodes]);
+
+  // Render nodes with object pooling
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+    const nodeLayer = container.children.find(child => child.name === 'nodeLayer') as Container;
+    if (!nodeLayer) return;
+
+    // Clear existing nodes
+    nodeLayer.removeChildren();
+
+    // Performance tracking
+    const startTime = performance.now();
+    let visibleNodeCount = 0;
+
+    // Render only visible nodes using object pool
+    processedNodes.forEach(nodeData => {
+      // Skip off-screen nodes for better performance
+      if (!nodeData.isVisible) return;
+
+      visibleNodeCount++;
+      const graphics = graphicsPoolRef.current.get();
+      renderNode(graphics, nodeData);
+      nodeLayer.addChild(graphics);
+    });
+
+    const renderTime = performance.now() - startTime;
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`Rendered ${visibleNodeCount}/${processedNodes.length} nodes in ${renderTime.toFixed(2)}ms`);
+    }
+
+    // Return graphics to pool after a delay to prevent flickering
+    setTimeout(() => {
+      // This would be handled by a more sophisticated pooling system
+    }, 100);
+  }, [processedNodes, renderNode]);
 
   return (
     <main
@@ -353,6 +447,37 @@ const EnhancedCanvasContent: React.FC = React.memo(() => {
         aria-label="Zoom to fit"
       >
         🎯
+      </button>
+
+      {/* Undo/Redo Controls */}
+      <button
+        className={`canvas-control-button undo ${!canUndo ? 'disabled' : ''}`}
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo (Ctrl+Z)"
+        aria-label="Undo last action"
+      >
+        ↶
+      </button>
+
+      <button
+        className={`canvas-control-button redo ${!canRedo ? 'disabled' : ''}`}
+        onClick={redo}
+        disabled={!canRedo}
+        title="Redo (Ctrl+Y)"
+        aria-label="Redo last undone action"
+      >
+        ↷
+      </button>
+
+      {/* Animation Control for Accessibility */}
+      <button
+        className="canvas-control-button animation-toggle"
+        onClick={() => setAnimationsPaused(!animationsPaused)}
+        title={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
+        aria-label={animationsPaused ? 'Resume animations' : 'Pause animations'}
+      >
+        {animationsPaused ? '▶️' : '⏸️'}
       </button>
     </main>
   );

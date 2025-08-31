@@ -5,7 +5,7 @@
  * instead of duplicating routing, auth, notifications, and theming.
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // ============================================================================
@@ -113,6 +113,10 @@ const useNotifications = () => ({
 // ============================================================================
 // WORKFLOW STUDIO SPECIFIC COMPONENTS
 // ============================================================================
+
+// Import Command Palette
+import CommandPalette from './ui/CommandPalette';
+import './ui/CommandPalette.css';
 
 // Loading component using existing patterns
 const LoadingSpinner = () => (
@@ -336,8 +340,50 @@ const WorkflowBuilderPage = () => {
 // ============================================================================
 
 const WorkflowStudioApp: React.FC = () => {
+  // Command Palette State
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [currentContext, setCurrentContext] = useState({
+    page: 'dashboard',
+    workflowId: undefined,
+    nodeId: undefined,
+    selectedItems: []
+  });
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K to open command palette
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+      }
+
+      // Escape to close command palette
+      if (e.key === 'Escape' && isCommandPaletteOpen) {
+        setIsCommandPaletteOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isCommandPaletteOpen]);
+
+  // Update context based on current route
+  useEffect(() => {
+    const path = window.location.pathname;
+    const page = path.split('/')[1] || 'dashboard';
+    setCurrentContext(prev => ({ ...prev, page }));
+  }, []);
+
   return (
     <div className="workflow-studio-app">
+      {/* Universal Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        currentContext={currentContext}
+      />
+
       <Routes>
         {/* Public routes */}
         <Route

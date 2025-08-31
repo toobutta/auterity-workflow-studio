@@ -1,6 +1,12 @@
 import React, { Suspense, lazy } from 'react';
 import { useStudioStore } from '../../hooks/useStudioStore.js';
 import { EnhancedCanvas } from '../canvas/EnhancedCanvas.js';
+import {
+  CogIcon,
+  ChartBarIcon,
+  QuestionMarkCircleIcon,
+  ArrowRightOnRectangleIcon
+} from '@heroicons/react/24/outline';
 import './StudioLayout.css';
 
 // Lazy load heavy components
@@ -103,25 +109,25 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({ onLogout }) => {
               <div className="user-menu-divider"></div>
 
               <button className="user-menu-item">
-                <span className="menu-icon">⚙️</span>
-                Settings
+                <CogIcon className="w-4 h-4" />
+                <span>Settings</span>
               </button>
 
               <button className="user-menu-item">
-                <span className="menu-icon">📊</span>
-                Usage & Billing
+                <ChartBarIcon className="w-4 h-4" />
+                <span>Usage & Billing</span>
               </button>
 
               <button className="user-menu-item">
-                <span className="menu-icon">🆘</span>
-                Help & Support
+                <QuestionMarkCircleIcon className="w-4 h-4" />
+                <span>Help & Support</span>
               </button>
 
               <div className="user-menu-divider"></div>
 
               <button className="user-menu-item logout-button" onClick={onLogout}>
-                <span className="menu-icon">🚪</span>
-                Sign Out
+                <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                <span>Sign Out</span>
               </button>
             </div>
           </div>

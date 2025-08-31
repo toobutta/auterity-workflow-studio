@@ -1,8 +1,17 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useStudioStore } from '../../hooks/useStudioStore';
 import { StudioNode } from '../../types/studio';
 import { NODE_PROPERTY_SCHEMAS } from '../../constants/propertySchemas';
 import { PropertySchema, PropertyGroup, PropertyTemplate, ValidationResult } from '../../types/properties';
+import {
+  CogIcon,
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  ChevronDownIcon
+} from '@heroicons/react/24/outline';
 import './PropertiesPanel.css';
 
 interface PropertiesPanelProps {
@@ -236,7 +245,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           onClick={onToggleCollapse}
           aria-label="Expand properties panel"
         >
-          ◀️
+          <ChevronLeftIcon className="w-4 h-4" />
         </button>
       </div>
     );
@@ -252,7 +261,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           onClick={onToggleCollapse}
           aria-label="Collapse properties panel"
         >
-          ▶️
+          <ChevronRightIcon className="w-4 h-4" />
         </button>
       </div>
 
@@ -275,14 +284,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               onClick={() => setShowAdvanced(!showAdvanced)}
               title={showAdvanced ? 'Hide advanced properties' : 'Show advanced properties'}
             >
-              ⚙️
+              <CogIcon className="w-4 h-4" />
             </button>
             <button
               className="btn-icon"
               onClick={resetToDefaults}
               title="Reset to defaults"
             >
-              ↻
+              <ArrowPathIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -344,7 +353,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <h4>{group.label}</h4>
                     {group.collapsible && (
                       <button className="group-toggle">
-                        {isExpanded ? '▼' : '▶'}
+                        {isExpanded ? 
+                          <ChevronDownIcon className="w-4 h-4" /> : 
+                          <ChevronRightIcon className="w-4 h-4" />
+                        }
                       </button>
                     )}
                   </div>
@@ -370,7 +382,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         ) : (
           <div className="no-selection">
-            <div className="no-selection-icon">🔍</div>
+            <div className="no-selection-icon">
+              <MagnifyingGlassIcon className="w-8 h-8 text-gray-400" />
+            </div>
             <h4>No Node Selected</h4>
             <p>Select a node to edit its properties</p>
           </div>
@@ -403,25 +417,56 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   );
 };
 
-// Property Field Component
+// Enhanced Property Field Component
 interface PropertyFieldProps {
   schema: PropertySchema;
   value: any;
   onChange: (value: any) => void;
   error?: string;
+  isValidating?: boolean;
 }
 
-const PropertyField: React.FC<PropertyFieldProps> = ({ schema, value, onChange, error }) => {
+const PropertyField: React.FC<PropertyFieldProps> = ({
+  schema,
+  value,
+  onChange,
+  error,
+  isValidating = false
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+
   const renderField = () => {
+    const baseProps = {
+      value: localValue || '',
+      onChange: (e: any) => setLocalValue(e.target.value),
+      onFocus: () => setIsFocused(true),
+      onBlur: handleBlur,
+      className: `property-input-field ${error ? 'error' : ''} ${isFocused ? 'focused' : ''}`,
+      'aria-describedby': schema.description ? `${schema.id}-description` : undefined,
+      'aria-invalid': !!error,
+      'aria-required': schema.required
+    };
+
     switch (schema.type) {
       case 'text':
         return (
           <input
             type="text"
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={schema.description}
-            className={error ? 'error' : ''}
+            {...baseProps}
+            placeholder={schema.placeholder || schema.description}
+            maxLength={schema.validation.find(v => v.type === 'max')?.value}
           />
         );
 
@@ -429,31 +474,54 @@ const PropertyField: React.FC<PropertyFieldProps> = ({ schema, value, onChange, 
         return (
           <input
             type="number"
-            value={value || 0}
-            onChange={(e) => onChange(Number(e.target.value))}
+            {...baseProps}
             min={schema.validation.find(v => v.type === 'min')?.value}
             max={schema.validation.find(v => v.type === 'max')?.value}
-            className={error ? 'error' : ''}
+            step={schema.step || 1}
+            value={localValue || 0}
+            onChange={(e) => setLocalValue(Number(e.target.value))}
           />
         );
 
       case 'boolean':
         return (
-          <input
-            type="checkbox"
-            checked={value || false}
-            onChange={(e) => onChange(e.target.checked)}
-          />
+          <div className="toggle-container">
+            <input
+              type="checkbox"
+              id={`${schema.id}-toggle`}
+              checked={localValue || false}
+              onChange={(e) => {
+                setLocalValue(e.target.checked);
+                onChange(e.target.checked);
+              }}
+              className="toggle-input"
+            />
+            <label
+              htmlFor={`${schema.id}-toggle`}
+              className="toggle-label"
+            >
+              <span className="toggle-switch"></span>
+              <span className="toggle-text">
+                {localValue ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+          </div>
         );
 
       case 'select':
         return (
           <select
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            className={error ? 'error' : ''}
+            {...baseProps}
+            value={localValue || ''}
+            onChange={(e) => {
+              setLocalValue(e.target.value);
+              onChange(e.target.value);
+            }}
+            className="property-select"
           >
-            <option value="">Select...</option>
+            <option value="">
+              {schema.placeholder || 'Select...'}
+            </option>
             {schema.options?.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -465,26 +533,70 @@ const PropertyField: React.FC<PropertyFieldProps> = ({ schema, value, onChange, 
       case 'textarea':
         return (
           <textarea
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={schema.description}
-            rows={3}
-            className={error ? 'error' : ''}
+            {...baseProps}
+            rows={schema.rows || 3}
+            placeholder={schema.placeholder || schema.description}
+            maxLength={schema.validation.find(v => v.type === 'max')?.value}
+            className="property-textarea"
           />
         );
 
       case 'slider':
+        const min = schema.validation.find(v => v.type === 'min')?.value || 0;
+        const max = schema.validation.find(v => v.type === 'max')?.value || 1;
+        const step = schema.step || 0.1;
+
         return (
           <div className="slider-container">
+            <div className="slider-wrapper">
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={localValue || schema.defaultValue || min}
+                onChange={(e) => {
+                  setLocalValue(Number(e.target.value));
+                  onChange(Number(e.target.value));
+                }}
+                className="property-slider"
+              />
+              <div className="slider-track"></div>
+            </div>
+            <div className="slider-value-display">
+              <span className="slider-value">
+                {(localValue || schema.defaultValue || min).toFixed(1)}
+              </span>
+              <span className="slider-range">
+                ({min} - {max})
+              </span>
+            </div>
+          </div>
+        );
+
+      case 'color':
+        return (
+          <div className="color-picker-container">
             <input
-              type="range"
-              min={schema.validation.find(v => v.type === 'min')?.value || 0}
-              max={schema.validation.find(v => v.type === 'max')?.value || 1}
-              step="0.1"
-              value={value || schema.defaultValue}
-              onChange={(e) => onChange(Number(e.target.value))}
+              type="color"
+              {...baseProps}
+              value={localValue || '#3b82f6'}
+              onChange={(e) => {
+                setLocalValue(e.target.value);
+                onChange(e.target.value);
+              }}
+              className="property-color"
             />
-            <span className="slider-value">{value?.toFixed(1) || schema.defaultValue}</span>
+            <input
+              type="text"
+              value={localValue || '#3b82f6'}
+              onChange={(e) => {
+                setLocalValue(e.target.value);
+                onChange(e.target.value);
+              }}
+              className="property-color-text"
+              placeholder="#3b82f6"
+            />
           </div>
         );
 
@@ -492,29 +604,54 @@ const PropertyField: React.FC<PropertyFieldProps> = ({ schema, value, onChange, 
         return (
           <input
             type="text"
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={`Enter ${schema.type}...`}
-            className={error ? 'error' : ''}
+            {...baseProps}
+            placeholder={schema.placeholder || `Enter ${schema.type}...`}
           />
         );
     }
   };
 
   return (
-    <div className="property-field">
-      <label className="property-label">
-        {schema.label}
-        {schema.required && <span className="required">*</span>}
-        {schema.advanced && <span className="advanced-badge">ADV</span>}
-      </label>
+    <div className={`property-field ${error ? 'has-error' : ''} ${isValidating ? 'validating' : ''}`}>
+      <div className="property-header">
+        <label className="property-label">
+          <span className="label-text">{schema.label}</span>
+          {schema.required && <span className="required-indicator">*</span>}
+          {schema.advanced && <span className="advanced-indicator">Advanced</span>}
+        </label>
+
+        {isValidating && (
+          <div className="validation-indicator">
+            <ArrowPathIcon className="validation-spinner" />
+          </div>
+        )}
+      </div>
+
       {schema.description && (
-        <div className="property-description">{schema.description}</div>
+        <div
+          id={`${schema.id}-description`}
+          className="property-description"
+        >
+          {schema.description}
+        </div>
       )}
-      <div className="property-input">
+
+      <div className="property-input-wrapper">
         {renderField()}
       </div>
-      {error && <div className="property-error">{error}</div>}
+
+      {error && (
+        <div className="property-error-message" role="alert">
+          <span className="error-icon">⚠</span>
+          <span className="error-text">{error}</span>
+        </div>
+      )}
+
+      {schema.hint && !error && (
+        <div className="property-hint">
+          <span className="hint-text">{schema.hint}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,80 +1,88 @@
-/* Toolbar Styles */
+/* Professional Toolbar Styling */
+@import url('../../../design/system/tokens.css');
+
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  min-height: 48px;
-  overflow-x: auto;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: var(--z-index-docked);
 }
 
+/* Toolbar Groups */
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
 }
 
+.toolbar-separator {
+  width: 1px;
+  height: var(--size-6);
+  background: var(--color-border-default);
+  margin: 0 var(--space-2);
+}
+
+/* Toolbar Buttons */
 .toolbar-button {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
-  border-radius: 6px;
-  background-color: transparent;
-  color: var(--color-text);
-  font-size: 14px;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  -webkit-user-select: none;
-  user-select: none;
+  transition: var(--transition-all);
+  min-width: 60px;
+  position: relative;
 }
 
 .toolbar-button:hover {
-  background-color: var(--color-border);
-  border-color: var(--color-border);
-}
-
-.toolbar-button:active {
-  transform: translateY(1px);
+  background: var(--color-surface-tertiary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-button-hover);
 }
 
 .toolbar-button.active {
-  background-color: var(--color-primary);
-  color: white;
-  border-color: var(--color-primary);
+  background: var(--color-primary-50);
+  color: var(--color-primary-600);
+  border-color: var(--color-primary-200);
+  box-shadow: var(--shadow-button);
+}
+
+.toolbar-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--color-primary-500);
 }
 
 .toolbar-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  pointer-events: none;
+  transform: none;
 }
 
-.tool-icon {
-  font-size: 16px;
-  line-height: 1;
-}
-
+/* Tool Labels */
 .tool-label {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Separator */
-.toolbar-separator {
-  width: 1px;
-  height: 24px;
-  background-color: var(--color-border);
-  margin: 0 4px;
-}
-
-/* Spacer */
-.toolbar-spacer {
-  flex: 1;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* Zoom Display */
@@ -82,170 +90,103 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   min-width: 60px;
-  padding: 6px 8px;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text);
-  font-family: monospace;
 }
 
-/* Status */
+/* Toolbar Spacer */
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Toolbar Status */
 .toolbar-status {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
+  gap: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .status-item {
-  padding: 4px 8px;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-family: monospace;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
   .toolbar {
-    padding: 6px 12px;
-    gap: 6px;
+    flex-wrap: wrap;
+    padding: var(--space-2);
+  }
+  
+  .toolbar-group {
+    flex-wrap: wrap;
   }
   
   .toolbar-button {
-    padding: 6px 8px;
+    min-width: 48px;
+    padding: var(--space-2);
   }
   
   .tool-label {
     display: none;
   }
-  
-  .toolbar-status {
-    display: none;
-  }
-  
-  .zoom-display {
-    min-width: 50px;
-    padding: 4px 6px;
-  }
 }
 
-@media (max-width: 480px) {
-  .toolbar {
-    padding: 4px 8px;
-    gap: 4px;
-    min-height: 40px;
-  }
-  
-  .toolbar-button {
-    padding: 4px 6px;
-  }
-  
-  .tool-icon {
-    font-size: 14px;
-  }
-  
-  .toolbar-separator {
-    height: 20px;
-    margin: 0 2px;
-  }
-  
-  .zoom-display {
-    min-width: 45px;
-    font-size: 11px;
-  }
-}
-
-/* High Contrast Mode */
+/* High Contrast Support */
 @media (prefers-contrast: high) {
   .toolbar-button {
-    border: 1px solid currentColor;
+    border: var(--high-contrast-border) var(--color-border-strong);
   }
   
   .toolbar-button.active {
-    background-color: var(--color-text);
-    color: var(--color-background);
+    border: var(--high-contrast-border) var(--color-primary-600);
+    background: var(--color-primary-100);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-button {
+    transition: none;
   }
   
-  .zoom-display,
-  .status-item {
-    border: 1px solid currentColor;
+  .toolbar-button:hover {
+    transform: none;
   }
 }
 
-/* Focus States */
-.toolbar-button:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.toolbar-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Dark Theme Adjustments */
-.toolbar[data-theme="dark"] .toolbar-button.active {
-  background-color: var(--color-primary);
-  color: var(--color-background);
-}
-
-/* Toolbar Animations */
-.toolbar-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.toolbar-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.toolbar-button:hover::before {
-  left: 100%;
-}
-
-/* Keyboard Shortcuts Display */
-.toolbar-button[title]:hover::after {
-  content: attr(title);
-  position: absolute;
-  bottom: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--color-text);
-  color: var(--color-background);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-/* Scrollbar for mobile overflow */
-.toolbar::-webkit-scrollbar {
-  height: 4px;
-}
-
-.toolbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.toolbar::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 2px;
-}
-
-.toolbar::-webkit-scrollbar-thumb:hover {
-  background: var(--color-secondary);
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .toolbar {
+    background: var(--color-surface-primary);
+    border-color: var(--color-border-subtle);
+  }
+  
+  .toolbar-group {
+    background: var(--color-surface-secondary);
+    border-color: var(--color-border-subtle);
+  }
+  
+  .toolbar-button.active {
+    background: var(--color-primary-900);
+    color: var(--color-primary-300);
+    border-color: var(--color-primary-700);
+  }
+  
+  .zoom-display {
+    background: var(--color-surface-primary);
+    border-color: var(--color-border-default);
+  }
 }

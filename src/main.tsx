@@ -5,6 +5,9 @@ import WorkflowStudioApp from './components/WorkflowStudioApp'
 import './WorkflowStudioStyles.css'
 import './index.css'
 
+// Set document language for accessibility
+document.documentElement.lang = 'en-US';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>

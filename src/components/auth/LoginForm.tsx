@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { authService } from '../../services/authService';
+import {
+  ExclamationTriangleIcon,
+  LockClosedIcon,
+  PaintBrushIcon,
+  CpuChipIcon,
+  BoltIcon
+} from '@heroicons/react/24/outline';
 import './LoginForm.css';
 
 interface LoginFormProps {
@@ -71,8 +78,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <div className="login-form-body">
           {error && (
             <div className="login-error-message">
-              <span className="login-error-icon">⚠️</span>
-              {error}
+              <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -88,8 +95,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               </div>
             ) : (
               <>
-                <span className="login-button-icon">🔐</span>
-                Sign in with Auterity
+                <LockClosedIcon className="w-5 h-5" />
+                <span>Sign in with Auterity</span>
               </>
             )}
           </button>
@@ -106,17 +113,23 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       <div className="login-features">
         <div className="login-feature">
-          <div className="login-feature-icon">🎨</div>
+          <div className="login-feature-icon">
+            <PaintBrushIcon className="w-8 h-8 text-primary-500" />
+          </div>
           <h3>Visual Workflow Builder</h3>
           <p>Design complex automation workflows with our drag-and-drop interface</p>
         </div>
         <div className="login-feature">
-          <div className="login-feature-icon">🤖</div>
+          <div className="login-feature-icon">
+            <CpuChipIcon className="w-8 h-8 text-primary-500" />
+          </div>
           <h3>AI-Powered Automation</h3>
           <p>Leverage AI models and function calling for intelligent workflow steps</p>
         </div>
         <div className="login-feature">
-          <div className="login-feature-icon">⚡</div>
+          <div className="login-feature-icon">
+            <BoltIcon className="w-8 h-8 text-primary-500" />
+          </div>
           <h3>Real-Time Execution</h3>
           <p>Monitor and debug your workflows with live execution tracking</p>
         </div>
