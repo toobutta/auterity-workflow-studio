@@ -4,3 +4,21 @@ dist
 *.log
 .DS_Store
 coverage
+
+# Build artifacts
+*.tgz
+.vite
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/

@@ -53,9 +53,9 @@ npm run test:accessibility
 ## 🚀 AI SDK Integration & Development Roadmap
 
 **NEW**: Comprehensive AI SDK implementation plan available:
-- **[OPTIMIZED_AI_SDK_IMPLEMENTATION_PLAN.md](./OPTIMIZED_AI_SDK_IMPLEMENTATION_PLAN.md)** - 67% faster implementation leveraging existing scaffolding
-- **[AI_SDK_QUICK_START_GUIDE.md](./AI_SDK_QUICK_START_GUIDE.md)** - Get AI responses in < 2 hours using existing components
-- **[COMPREHENSIVE_AI_SDK_IMPLEMENTATION_PLAN.md](./COMPREHENSIVE_AI_SDK_IMPLEMENTATION_PLAN.md)** - Complete technical roadmap with all dependencies
+- **[OPTIMIZED_AI_SDK_IMPLEMENTATION_PLAN.md](./docs/plans/OPTIMIZED_AI_SDK_IMPLEMENTATION_PLAN.md)** - 67% faster implementation leveraging existing scaffolding
+- **[AI_SDK_QUICK_START_GUIDE.md](./docs/guides/AI_SDK_QUICK_START_GUIDE.md)** - Get AI responses in < 2 hours using existing components
+- **[COMPREHENSIVE_AI_SDK_IMPLEMENTATION_PLAN.md](./docs/ai/COMPREHENSIVE_AI_SDK_IMPLEMENTATION_PLAN.md)** - Complete technical roadmap with all dependencies
 
 ### Key Benefits:
 - **67% reduction** in implementation time (64 hours saved)
