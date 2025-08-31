@@ -8,6 +8,7 @@ import { generateText, generateObject, streamText, tool, CoreMessage } from 'ai'
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
+import { webAssemblyOptimizer, AIWasmIntegration } from './webAssemblyOptimizer';
 
 // Enhanced configuration with LangSmith and PromptLayer
 const ENHANCED_AI_CONFIG = {
@@ -363,6 +364,174 @@ export class EnhancedAIService {
       ),
       cacheSize: this.cache.size
     };
+  }
+
+  // WebAssembly-optimized error analysis
+  async analyzeError(
+    errorData: {
+      message: string;
+      stackTrace?: string;
+      context?: Record<string, any>;
+      logs?: string[];
+      environment?: Record<string, any>;
+    },
+    options: {
+      analysisType: 'root_cause' | 'impact_assessment' | 'resolution_suggestions' | 'preventive_measures';
+      provider?: string;
+      includeHistorical?: boolean;
+    } = { analysisType: 'root_cause' }
+  ): Promise<any> {
+    const { analysisType, provider = 'anthropic', includeHistorical = true } = options;
+
+    return this.tracer.trace('analyzeError', { analysisType, provider }, async () => {
+      const circuitBreaker = this.circuitBreakers.get(provider);
+      if (!circuitBreaker) {
+        throw new Error(`Provider ${provider} not available`);
+      }
+
+      return circuitBreaker.execute(async () => {
+        // Pre-process error data using WASM for performance
+        const processedData = await this.preprocessErrorData(errorData);
+
+        // Version prompt if PromptLayer is enabled
+        const prompt = await this.promptManager.versionPrompt(
+          `error_analysis_${analysisType}`,
+          this.generateErrorAnalysisPrompt(processedData, analysisType, includeHistorical),
+          ['error-intelligence', analysisType]
+        );
+
+        const selectedProvider = ENHANCED_PROVIDERS[provider as keyof typeof ENHANCED_PROVIDERS];
+        if (!selectedProvider) {
+          throw new Error(`Provider ${provider} not configured`);
+        }
+
+        const result = await generateObject({
+          model: selectedProvider,
+          prompt,
+          schema: this.getErrorAnalysisSchema(analysisType)
+        });
+
+        // Post-process results with WASM optimization
+        const optimizedResult = await this.optimizeAnalysisResult(result.object, analysisType);
+
+        return {
+          analysis: optimizedResult,
+          analysisType,
+          timestamp: new Date().toISOString(),
+          provider,
+          confidence: this.calculateConfidence(optimizedResult),
+          wasmMetrics: AIWasmIntegration.getOptimizationMetrics()
+        };
+      });
+    });
+  }
+
+  // WASM preprocessing for error data
+  private async preprocessErrorData(errorData: any): Promise<any> {
+    try {
+      // Use WASM for text processing and feature extraction
+      if (errorData.stackTrace) {
+        const stackFeatures = await AIWasmIntegration.optimizeAIProcessing(
+          { text: errorData.stackTrace, operation: 'feature_extract' },
+          'feature_extraction'
+        );
+        errorData.stackFeatures = stackFeatures;
+      }
+
+      if (errorData.logs && errorData.logs.length > 0) {
+        // Use WASM for log pattern analysis
+        const logPatterns = await AIWasmIntegration.optimizeAIProcessing(
+          { data: errorData.logs, operation: 'similarity_computation' },
+          'similarity_computation'
+        );
+        errorData.logPatterns = logPatterns;
+      }
+
+      return errorData;
+    } catch (error) {
+      console.warn('WASM preprocessing failed, using original data:', error);
+      return errorData;
+    }
+  }
+
+  // WASM optimization for analysis results
+  private async optimizeAnalysisResult(result: any, analysisType: string): Promise<any> {
+    try {
+      // Use WASM for result optimization based on analysis type
+      switch (analysisType) {
+        case 'root_cause':
+          return await AIWasmIntegration.optimizeAIProcessing(
+            { data: result, operation: 'similarity_computation' },
+            'similarity_computation'
+          );
+        case 'impact_assessment':
+          return await AIWasmIntegration.optimizeAIProcessing(
+            { data: result, operation: 'tensor_operations' },
+            'tensor_operations'
+          );
+        default:
+          return result;
+      }
+    } catch (error) {
+      console.warn('WASM result optimization failed:', error);
+      return result;
+    }
+  }
+
+  // Generate error analysis prompt
+  private generateErrorAnalysisPrompt(
+    errorData: any,
+    analysisType: string,
+    includeHistorical: boolean
+  ): string {
+    return `
+Analyze the following error for ${analysisType}:
+
+Error Message: ${errorData.message}
+${errorData.stackTrace ? `Stack Trace: ${errorData.stackTrace}` : ''}
+${errorData.context ? `Context: ${JSON.stringify(errorData.context, null, 2)}` : ''}
+${errorData.logs ? `Recent Logs: ${errorData.logs.join('\n')}` : ''}
+${errorData.environment ? `Environment: ${JSON.stringify(errorData.environment, null, 2)}` : ''}
+
+${includeHistorical ? 'Consider historical patterns and similar errors when analyzing.' : ''}
+
+Provide a comprehensive analysis including:
+- Root cause identification
+- Impact assessment
+- Resolution recommendations
+- Preventive measures
+- Risk level assessment
+`;
+  }
+
+  // Get analysis schema based on type
+  private getErrorAnalysisSchema(analysisType: string) {
+    const baseSchema = {
+      rootCause: z.string(),
+      impact: z.enum(['low', 'medium', 'high', 'critical']),
+      affectedSystems: z.array(z.string()),
+      recommendations: z.array(z.string()),
+      preventiveMeasures: z.array(z.string()),
+      confidence: z.number()
+    };
+
+    switch (analysisType) {
+      case 'root_cause':
+        return z.object({
+          ...baseSchema,
+          contributingFactors: z.array(z.string()),
+          similarIncidents: z.array(z.string()).optional()
+        });
+      case 'impact_assessment':
+        return z.object({
+          ...baseSchema,
+          affectedUsers: z.number(),
+          businessImpact: z.string(),
+          recoveryTime: z.string()
+        });
+      default:
+        return z.object(baseSchema);
+    }
   }
 
   // Clear caches and traces

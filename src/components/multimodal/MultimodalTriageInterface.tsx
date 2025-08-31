@@ -12,7 +12,7 @@ import {
   ScreenshotAnalysis,
   LogDump,
   MultimodalAnalysisResult
-} from '../../services/multimodalTriageService';
+} from '../../services/multimodalTriageService.js';
 import {
   MicrophoneIcon,
   StopIcon,
@@ -27,7 +27,8 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { MicrophoneIcon as MicrophoneSolidIcon } from '@heroicons/react/24/solid';
 
@@ -136,9 +137,11 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
         const voiceCommand: VoiceCommand = {
           transcript: '', // Will be filled by AI service
           confidence: 0, // Will be filled by AI service
+          language: 'en-US',
           duration: 0, // Calculate from audio
           audioData: base64Audio.split(',')[1], // Remove data URL prefix
-          timestamp: new Date()
+          timestamp: new Date(),
+          keywords: []
         };
 
         // Process voice command
@@ -344,13 +347,17 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
             voiceCommand = {
               transcript: '',
               confidence: 0,
+              language: 'en-US',
               duration: 0,
               audioData: base64Audio.split(',')[1],
-              timestamp: new Date()
+              timestamp: new Date(),
+              keywords: []
             };
             resolve();
           };
-          reader.readAsDataURL(analysisState.recordedAudio);
+          if (analysisState.recordedAudio) {
+            reader.readAsDataURL(analysisState.recordedAudio);
+          }
         });
       }
 
@@ -378,7 +385,9 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
               };
               img.src = base64Image;
             };
-            reader.readAsDataURL(analysisState.selectedFile);
+            if (analysisState.selectedFile) {
+              reader.readAsDataURL(analysisState.selectedFile);
+            }
           });
         } else {
           // Log dump
@@ -395,7 +404,9 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
               };
               resolve();
             };
-            reader.readAsText(analysisState.selectedFile);
+            if (analysisState.selectedFile) {
+              reader.readAsText(analysisState.selectedFile);
+            }
           });
         }
       }
@@ -768,6 +779,7 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
           accept={activeModality === 'screenshot' ? 'image/*' : activeModality === 'log' ? '.log,.txt,.json,.xml,.csv' : '*'}
           onChange={handleFileSelect}
           className="hidden"
+          title="File upload for multimodal triage analysis"
         />
       </div>
 
@@ -867,7 +879,7 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
               <div className="mb-6">
                 <h5 className="font-medium text-gray-900 mb-3">Recommended Actions</h5>
                 <div className="space-y-2">
-                  {analysisState.analysisResult.recommendedActions.map((action, index) => (
+                  {analysisState.analysisResult.recommendedActions.map((action: { id: string; description: string; priority: number; type: string; estimatedTime: number }, index: number) => (
                     <div key={action.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className={`w-2 h-2 rounded-full mt-2 ${
                         action.priority >= 4 ? 'bg-red-500' :
@@ -901,7 +913,7 @@ export const MultimodalTriageInterface: React.FC<MultimodalTriageInterfaceProps>
               <div>
                 <h5 className="font-medium text-gray-900 mb-3">Automated Responses</h5>
                 <div className="space-y-2">
-                  {analysisState.analysisResult.automatedResponses.map((response, index) => (
+                  {analysisState.analysisResult.automatedResponses.map((response: { status: string; action: string; result?: string }, index: number) => (
                     <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded">
                       {response.status === 'completed' ? (
                         <CheckCircleIcon className="h-5 w-5 text-green-500" />

@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useAuth } from '../../../auterity-error-iq/frontend/src/contexts/AuthContext.js';
-import { useNotifications } from '../../../auterity-error-iq/frontend/src/components/notifications/NotificationSystem.js';
+import { useAuth } from '../../contexts/AuthContext.js';
+import { useNotifications } from '../../components/notifications/NotificationSystem.js';
 // @ts-ignore - External module
 import {
   ChatBubbleLeftRightIcon,
@@ -515,14 +515,15 @@ What would you like to work on today?`,
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="expand-button"
-              aria-expanded={isExpanded}
+              data-expanded={isExpanded}
+              aria-controls="expandable-details"
             >
               <span>{isExpanded ? 'Hide' : 'Show'} details</span>
               <ChevronDownIcon className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
 
             {isExpanded && (
-              <div className="expanded-details">
+              <div id="expandable-details" className="expanded-details">
                 <div className="detail-section">
                   <h5>AI Reasoning</h5>
                   <p>{action.expandableDetails.reasoning}</p>
