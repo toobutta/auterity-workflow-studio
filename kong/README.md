@@ -26,9 +26,9 @@ kong/
 
 1. **Copy configuration to Kong server:**
    ```bash
-   # From the auterity-error-iq project root
-   cp ../auterity-workflow-studio/kong/* kong/
-   cd kong
+   # Copy Kong configuration files to your Kong server
+   cp -r kong/* /path/to/kong/
+   cd /path/to/kong/
    ```
 
 2. **Set environment variables:**

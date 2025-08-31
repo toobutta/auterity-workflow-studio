@@ -6,23 +6,11 @@ A modern 2D workflow canvas built with React, PixiJS, and the canonical workflow
 
 ### Prerequisites
 
-1. **API Server Running** (in separate terminal):
-```powershell
-cd ../auterity-error-iq/apps/api
-npm ci
-npm run dev
-# API runs at http://localhost:5055
-```
-
-2. **Contracts Package** (already included as local tarball):
-```powershell
-# Verify contracts tarball exists:
-ls ../auterity-error-iq/packages/workflow-contracts/auterity-workflow-contracts-1.0.0.tgz
-```
+**Node.js 18+** required for development.
 
 ### Install & Run
 
-```powershell
+```bash
 # Install dependencies
 npm ci
 
@@ -33,12 +21,9 @@ npm run dev
 
 ### Test
 
-```powershell
-# Run unit tests (contracts integration)
+```bash
+# Run unit tests
 npm test
-
-# Run API integration tests (requires API server running)
-npm test src/__tests__/api.test.ts
 
 # Run tests with UI
 npm run test:ui
@@ -356,17 +341,11 @@ curl "http://localhost:5055/v1/workflows/YOUR_ID" -H "x-api-key: dev-api-key-123
 **Service worker issues**: Clear application cache and reload
 
 **Build errors**: Ensure all dependencies are installed:
-```powershell
+```bash
 npm ci
 ```
 
-**Contracts not found**: Rebuild and repack contracts:
-```powershell
-cd ../auterity-error-iq/packages/workflow-contracts
-npm run build
-npm pack
-npm ci # in studio to reinstall
-```
+**Contracts not available**: Contact repository maintainer for workflow contracts package
 
 **PixiJS rendering issues**: Check browser console; ensure Canvas component renders inside a mounted div.
 

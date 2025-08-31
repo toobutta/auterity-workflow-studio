@@ -1,3 +1,4 @@
+---
 name: Vercel Preview Deployment
 
 on:
@@ -28,7 +29,9 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        run: >
+          vercel pull --yes --environment=preview
+          --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
         run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
@@ -36,7 +39,8 @@ jobs:
       - name: Deploy Project Artifacts to Vercel
         id: deploy
         run: |
-          deployment_url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          deployment_url=$(vercel deploy --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }})
           echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
 
       - name: Comment PR with deployment URL
@@ -45,12 +49,12 @@ jobs:
           script: |
             const deployment_url = '${{ steps.deploy.outputs.deployment_url }}';
             const comment = `🚀 **Preview Deployment Ready!**
-            
+
             Your changes have been deployed to Vercel:
             🔗 ${deployment_url}
-            
+
             This preview will be updated automatically as you push new commits.`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
