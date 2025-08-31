@@ -70,6 +70,15 @@ npm run test:accessibility
 - ✅ **Real-time Collaboration** - Google Docs-style editing
 - ✅ **AI Template Generation** - Dynamic workflow creation
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`/docs`](./docs/) directory:
+- 📖 **[Documentation Index](./docs/README.md)** - Complete guide to all documentation
+- 🤖 **[AI Integration](./docs/ai/)** - AI features and implementation guides  
+- 🛠️ **[Implementation Plans](./docs/implementations/)** - Current progress and roadmaps
+- 📋 **[Strategic Plans](./docs/plans/)** - Architecture and business requirements
+- 🔧 **[Tool Integration](./docs/tools/)** - Development tools and workflows
+
 ## Features
 
 ### 🚀 Performance Optimizations
