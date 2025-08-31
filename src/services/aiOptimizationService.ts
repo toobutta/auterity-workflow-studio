@@ -1,4 +1,8 @@
-// Minimal AI Optimization Service (stable, well-typed, test-friendly)
+// Enhanced AI Optimization Service with AI SDK integration
+import { generateObject } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
+
 type WorkflowShape = {
 	id: string;
 	nodes: Array<{ id: string; type?: string }>;
@@ -15,6 +19,43 @@ export type OptimizationResult = {
 	nextRecommendations: Array<{ id: string; type: string; description: string; priority: 'low' | 'medium' | 'high'; estimatedImpact: number }>;
 	timestamp: number;
 };
+
+// AI SDK Schema for structured optimization output
+const OptimizationSchema = z.object({
+	workflowId: z.string(),
+	optimizationType: z.enum(['performance', 'cost', 'reliability', 'comprehensive']),
+	improvements: z.object({
+		performanceGain: z.number().min(0).max(1),
+		costReduction: z.number().min(0).max(1),
+		resourceEfficiency: z.number().min(0).max(1),
+		qualityScore: z.number().min(0).max(1)
+	}),
+	confidence: z.number().min(0).max(1),
+	estimatedSavings: z.object({
+		timeMinutes: z.number(),
+		costUSD: z.number(),
+		resources: z.object({
+			cpu: z.number(),
+			memory: z.number(),
+			storage: z.number(),
+			network: z.number()
+		})
+	}),
+	appliedOptimizations: z.array(z.object({
+		type: z.string(),
+		description: z.string(),
+		impact: z.number(),
+		confidence: z.number()
+	})),
+	nextRecommendations: z.array(z.object({
+		id: z.string(),
+		type: z.string(),
+		description: z.string(),
+		priority: z.enum(['low', 'medium', 'high']),
+		estimatedImpact: z.number()
+	})),
+	timestamp: z.number()
+});
 
 export type PerformancePrediction = {
 	workflowId: string;
@@ -41,24 +82,106 @@ export class AIOptimizationService {
 		const key = `${workflow.id}-opt`;
 		if (this.optimizationCache.has(key)) return this.optimizationCache.get(key)!;
 
-		const perfGain = Math.min(0.5, workflow.nodes.length * 0.05);
-		const costReduction = Math.min(0.5, workflow.nodes.length * 0.02);
+		try {
+			// Use AI SDK to generate structured optimization analysis
+			const messages = [
+				{
+					role: 'system' as const,
+					content: `You are an expert workflow optimization AI. Analyze the provided workflow data and generate comprehensive optimization recommendations with structured output. Focus on practical improvements that can be implemented.`
+				},
+				{
+					role: 'user' as const,
+					content: `Analyze this workflow and provide optimization recommendations:
 
-		const appliedOptimizations = [{ type: 'performance', description: 'Reorder nodes', impact: perfGain, confidence: 0.8 }];
+Workflow Data: ${JSON.stringify(workflow, null, 2)}
 
-		const result: OptimizationResult = {
-			workflowId: workflow.id,
-			optimizationType: 'comprehensive',
-			improvements: { performanceGain: perfGain, costReduction, resourceEfficiency: 0.7, qualityScore: 0.85 },
-			confidence: 0.85,
-			estimatedSavings: { timeMinutes: perfGain * 60, costUSD: costReduction * 100, resources: { cpu: perfGain * 10, memory: perfGain * 50, storage: 0, network: 0 } },
-			appliedOptimizations,
-			nextRecommendations: [{ id: 'r1', type: 'parallelization', description: 'Increase parallelism', priority: 'medium', estimatedImpact: 0.15 }],
-			timestamp: Date.now()
-		};
+Consider:
+- Parallel execution opportunities
+- Database query optimization
+- Resource utilization improvements
+- Error handling enhancements
+- Caching strategies
 
-		this.optimizationCache.set(key, result);
-		return result;
+Provide detailed optimization analysis with realistic performance gains and cost reductions.`
+				}
+			];
+
+			const result = await generateObject({
+				model: openai('gpt-4o'),
+				schema: OptimizationSchema,
+				messages,
+				temperature: 0.3
+			});
+
+			const optimization = result.object;
+			this.optimizationCache.set(key, optimization);
+			return optimization;
+
+		} catch (error) {
+			logger.error('AI SDK optimization failed, falling back to heuristic approach', error);
+
+			// Fallback to heuristic-based optimization
+			const perfGain = Math.min(0.5, workflow.nodes.length * 0.05);
+			const costReduction = Math.min(0.5, workflow.nodes.length * 0.02);
+
+			const appliedOptimizations = [
+				{
+					type: 'performance',
+					description: 'Reorder nodes for better execution flow',
+					impact: perfGain,
+					confidence: 0.8
+				},
+				{
+					type: 'cost',
+					description: 'Optimize resource allocation',
+					impact: costReduction,
+					confidence: 0.7
+				}
+			];
+
+			const result: OptimizationResult = {
+				workflowId: workflow.id,
+				optimizationType: 'comprehensive',
+				improvements: {
+					performanceGain: perfGain,
+					costReduction,
+					resourceEfficiency: 0.7,
+					qualityScore: 0.85
+				},
+				confidence: 0.85,
+				estimatedSavings: {
+					timeMinutes: perfGain * 60,
+					costUSD: costReduction * 100,
+					resources: {
+						cpu: perfGain * 10,
+						memory: perfGain * 50,
+						storage: 0,
+						network: 0
+					}
+				},
+				appliedOptimizations,
+				nextRecommendations: [
+					{
+						id: 'r1',
+						type: 'parallelization',
+						description: 'Increase parallelism for independent tasks',
+						priority: 'medium',
+						estimatedImpact: 0.15
+					},
+					{
+						id: 'r2',
+						type: 'caching',
+						description: 'Implement caching for frequently accessed data',
+						priority: 'low',
+						estimatedImpact: 0.08
+					}
+				],
+				timestamp: Date.now()
+			};
+
+			this.optimizationCache.set(key, result);
+			return result;
+		}
 	}
 
 	async predictWorkflowPerformance(workflow: WorkflowShape): Promise<PerformancePrediction> {

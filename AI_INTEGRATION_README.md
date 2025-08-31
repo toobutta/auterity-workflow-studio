@@ -1,404 +1,265 @@
-# AI Integration for Workflow Studio
+# AI Integration - Workflow Studio
 
-This directory contains the AI integration components for the Auterity Workflow Studio, providing seamless integration with the AI Hub for function calling capabilities.
+## 🚀 Overview
 
-## 📁 Structure
+The Auterity Workflow Studio now includes comprehensive AI capabilities through a multi-provider SDK integration. This enables intelligent workflow optimization, cost-effective local AI processing, and enhanced user productivity.
 
-```
-src/
-├── nodes/ai/
-│   ├── AINodeFactory.ts          # Factory for creating AI nodes
-│   ├── TextGenerationNode.ts     # Text generation AI node
-│   └── ImageGenerationNode.ts    # Image generation AI node
-├── services/
-│   └── api.ts                    # API client with AI endpoints
-└── types/
-    └── auth.ts                   # Authentication types
-```
+## ✨ Features
 
-## 🚀 Quick Start
+### 🔧 AI Provider Management
+- **Multi-Provider Support**: OpenAI, Anthropic (Claude), Google (Gemini), Azure OpenAI, Cohere
+- **Local AI with Ollama**: Cost-free processing for development and testing
+- **Dynamic Provider Switching**: Real-time switching between providers
+- **Health Monitoring**: Automatic provider status checking
 
-### 1. Authentication Setup
+### 💰 Cost Optimization
+- **Real-time Cost Tracking**: Monitor AI usage costs across all providers
+- **Savings Calculator**: Track money saved using Ollama vs. commercial APIs
+- **Usage Analytics**: Detailed breakdown by operation and provider
+- **Budget Alerts**: Visual indicators for cost optimization
 
-The AI integration requires OIDC authentication with the AI Hub. Ensure your Kong configuration includes:
+### 🤖 AI Assistant
+- **Workflow Optimization**: AI-powered suggestions for workflow improvements
+- **Streaming Chat Interface**: Real-time conversations with AI
+- **Context-Aware Suggestions**: AI understands your current workflow context
+- **Smart Recommendations**: Intelligent suggestions for workflow enhancement
 
-```yaml
-plugins:
-  - name: jwt
-    service: ai-hub
-    config:
-      claims_to_verify: ["exp", "nbf", "aud"]
-      audience: ["ai-hub"]
-```
+## 🛠️ Setup Guide
 
-### 2. Basic Usage
+### 1. Environment Configuration
 
-```typescript
-import { aiNodeFactory } from './src/nodes/ai/AINodeFactory';
-
-// Discover available AI functions
-const functions = await aiNodeFactory.discoverFunctions();
-
-// Create an AI node
-const textNode = aiNodeFactory.createNode('text.generate', 'node-1', { x: 100, y: 100 }, {
-  model: 'gpt-4',
-  temperature: 0.7,
-  maxTokens: 1000
-});
-
-// Execute the node
-const result = await textNode.execute({
-  prompt: 'Write a hello world function in Python'
-});
-
-console.log(result.generatedText);
-```
-
-## 🤖 AI Node Types
-
-### TextGenerationNode
-
-Generates text using advanced language models.
-
-**Properties:**
-- `model`: GPT-4, Claude 3, Gemini Pro, GPT-3.5 Turbo
-- `temperature`: Controls creativity (0-2)
-- `maxTokens`: Maximum output length (1-4096)
-- `systemPrompt`: Instructions for the AI model
-- `streaming`: Enable real-time streaming
-- `outputVariable`: Variable name for output
-
-**Inputs:** `prompt`, `text`
-
-**Outputs:** Generated text, usage stats, cost, model info
-
-### ImageGenerationNode
-
-Generates images using AI models.
-
-**Properties:**
-- `model`: DALL-E 3, DALL-E 2, Stable Diffusion, Midjourney
-- `size`: Image dimensions (256x256 to 1792x1024)
-- `quality`: Standard or HD
-- `style`: Natural or vivid (DALL-E models)
-- `outputVariable`: Variable name for image URL
-
-**Inputs:** `prompt`, `description`
-
-**Outputs:** Image URL, revised prompt, metadata, usage, cost
-
-## 🔧 AI Node Factory
-
-### Discovery
-
-```typescript
-// Get all available AI functions
-const functions = await aiNodeFactory.discoverFunctions();
-
-// Get specific function metadata
-const textGenMeta = aiNodeFactory.getFunctionMetadata('text.generate');
-```
-
-### Node Creation
-
-```typescript
-// Create from built-in types
-const textNode = aiNodeFactory.createNode('ai.text.generate', 'node-1', position, config);
-
-// Create from discovered functions
-const customNode = aiNodeFactory.createNode('custom.analysis', 'node-2', position, config);
-
-// Check if node can be created
-if (aiNodeFactory.canCreateNode('text.generate')) {
-  // Node is available
-}
-```
-
-### Dynamic Node Creation
-
-The factory automatically creates nodes for any discovered AI function:
-
-```typescript
-// AI Hub returns a function schema
-{
-  "name": "sentiment.analysis",
-  "schema": {
-    "input": {
-      "properties": {
-        "text": {"type": "string"},
-        "model": {"type": "string", "enum": ["bert", "roberta"]}
-      },
-      "required": ["text"]
-    },
-    "output": {
-      "properties": {
-        "sentiment": {"type": "string"},
-        "confidence": {"type": "number"}
-      }
-    }
-  }
-}
-
-// Factory creates a node automatically
-const sentimentNode = aiNodeFactory.createNode('sentiment.analysis', 'node-3', position);
-```
-
-## 📡 API Integration
-
-### Authentication
-
-All AI API calls are automatically authenticated:
-
-```typescript
-// JWT token is automatically included
-const response = await apiClient.callAIFunction('text.generate', parameters);
-```
-
-### Error Handling
-
-```typescript
-try {
-  const result = await textNode.execute(inputs);
-} catch (error) {
-  if (error.code === 'RATE_LIMIT_EXCEEDED') {
-    // Handle rate limit
-    console.log(`Retry in ${error.details.retry_after_seconds}s`);
-  } else if (error.code === 'QUOTA_EXCEEDED') {
-    // Handle quota exceeded
-    console.log('Usage quota exceeded');
-  }
-}
-```
-
-### Streaming Support
-
-```typescript
-// Enable streaming in node properties
-const streamingNode = new TextGenerationNode('node-id', position, {
-  streaming: true
-});
-
-// Handle streaming response
-const result = await streamingNode.execute({ prompt: 'Tell me a story' });
-// Result is streamed in real-time
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
+Copy the example environment file and configure your API keys:
 
 ```bash
-# AI Hub API
-VITE_AI_HUB_URL=https://api.auterity.com/v1/ai
-
-# Authentication
-VITE_AUTH_AUTHORITY=https://auth.auterity.com
-VITE_AUTH_CLIENT_ID=workflow-studio
-VITE_AUTH_REDIRECT_URI=http://localhost:3000/auth/callback
+cp .env.example .env
 ```
 
-### Rate Limiting
+Configure your AI providers in `.env`:
 
-AI nodes respect rate limits automatically:
+```bash
+# Commercial AI Providers (Optional)
+VITE_OPENAI_API_KEY=your_openai_api_key_here
+VITE_ANTHROPIC_API_KEY=your_anthropic_api_key_here
+VITE_GOOGLE_API_KEY=your_google_api_key_here
 
-```typescript
-// Rate limits are enforced by Kong
-// Studio shows user-friendly error messages
+# Local AI with Ollama (Recommended for development)
+VITE_OLLAMA_ENDPOINT=http://localhost:11434
+VITE_OLLAMA_MODEL=llama3.2:3b
+
+# AI Features
+VITE_ENABLE_AI_ASSISTANT=true
+VITE_ENABLE_COST_TRACKING=true
+VITE_DEFAULT_AI_PROVIDER=ollama
 ```
 
-## 📊 Usage Tracking
+### 2. Install Ollama (Recommended)
 
-### Cost Monitoring
+For cost-free local AI processing:
 
-```typescript
-const result = await textNode.execute(inputs);
-console.log(`Cost: $${result.cost}`);
-console.log(`Tokens used: ${result.totalTokens}`);
+**Windows:**
+```bash
+# Download and install from https://ollama.ai
+# Or use winget
+winget install Ollama.Ollama
 ```
 
-### Usage Analytics
+**macOS:**
+```bash
+brew install ollama
+```
+
+**Linux:**
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+### 3. Setup Ollama Models
+
+```bash
+# Install recommended model (3B parameters, fast and efficient)
+ollama pull llama3.2:3b
+
+# Optional: Install larger models for better quality
+ollama pull llama3.2:8b
+ollama pull llama3.2:70b
+```
+
+### 4. Start Development
+
+```bash
+# Start Ollama service (if not running as service)
+ollama serve
+
+# Start the workflow studio
+npm run dev
+```
+
+## 🎯 Usage Guide
+
+### Accessing the AI Dashboard
+
+1. **Toggle AI Dashboard**: Click the AI button (🔧) in the toolbar
+2. **Switch Tabs**: Navigate between Provider Status, Cost Monitor, and AI Assistant
+3. **Resize Panel**: Drag the left edge to resize the AI dashboard
+
+### Provider Management
+
+**Status Tab:**
+- View real-time status of all AI providers
+- Switch between providers with one click
+- Monitor response times and health status
+- See configuration status for each provider
+
+**Cost Monitor Tab:**
+- Track spending across all AI providers
+- View savings from using Ollama
+- Get optimization recommendations
+- Monitor monthly usage trends
+
+**AI Assistant Tab:**
+- Chat with AI about workflow optimization
+- Get suggestions for improving your workflows
+- Ask questions about best practices
+- Receive context-aware recommendations
+
+### Best Practices
+
+1. **Start with Ollama**: Use local AI for development and testing
+2. **Commercial APIs for Production**: Switch to commercial providers for production workflows
+3. **Monitor Costs**: Keep track of API usage and optimize based on recommendations
+4. **Provider Selection**: Choose providers based on your specific use case:
+   - **Ollama**: Free, fast, good for development
+   - **Claude (Anthropic)**: Excellent reasoning, cost-effective
+   - **GPT-4 (OpenAI)**: Versatile, good general performance
+   - **Gemini (Google)**: Strong multimodal capabilities
+
+## 🔧 Configuration Options
+
+### Provider Configuration
 
 ```typescript
-// Track usage for billing
-const usage = {
-  function: 'text.generate',
-  tokens: result.totalTokens,
-  cost: result.cost,
-  timestamp: Date.now()
+// Provider priorities and models
+const PROVIDERS = {
+  ollama: 'llama3.2:3b',        // Local, free
+  anthropic: 'claude-3-5-sonnet', // Best reasoning
+  openai: 'gpt-4o',             // Most versatile
+  google: 'gemini-1.5-pro',     // Multimodal
+  cohere: 'command-r-plus'      // Good for specific tasks
 };
 ```
 
-## 🔧 Extending AI Nodes
+### Feature Toggles
 
-### Creating Custom AI Nodes
+```bash
+# Enable/disable specific features
+VITE_ENABLE_AI_ASSISTANT=true
+VITE_ENABLE_COST_TRACKING=true
+VITE_ENABLE_PROVIDER_HEALTH_CHECK=true
 
-```typescript
-import { StudioNode, NodeData, NodeStyle } from '../../types/studio';
-
-export class CustomAINode implements StudioNode {
-  // Implement StudioNode interface
-  async execute(inputs: Record<string, any>): Promise<Record<string, any>> {
-    // Call your custom AI function
-    const response = await apiClient.callAIFunction('custom.function', inputs);
-    return response.result;
-  }
-
-  // Register with factory
-  AINodeFactory.registerNodeType('custom.ai', CustomAINode);
-}
+# Performance settings
+VITE_AI_REQUEST_TIMEOUT=30000
+VITE_AI_MAX_RETRIES=3
+VITE_AI_BATCH_SIZE=10
 ```
 
-### Adding New AI Functions
-
-1. **Define function in AI Hub:**
-
-```json
-{
-  "name": "custom.analysis",
-  "description": "Custom analysis function",
-  "schema": {
-    "input": {"properties": {"data": {"type": "object"}}},
-    "output": {"properties": {"result": {"type": "object"}}}
-  }
-}
-```
-
-2. **Studio discovers automatically:**
-
-```typescript
-// Function appears in node palette
-const customNode = aiNodeFactory.createNode('custom.analysis', 'node-id', position);
-```
-
-## 🐛 Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Authentication Errors**
-   ```bash
-   # Check JWT token validity
-   curl -H "Authorization: Bearer <token>" https://api.auterity.com/v1/ai/functions
-   ```
+**Ollama Not Connecting:**
+```bash
+# Check if Ollama is running
+ollama list
 
-2. **Rate Limit Errors**
-   ```typescript
-   // Implement exponential backoff
-   const result = await retryWithBackoff(() => node.execute(inputs));
-   ```
+# Start Ollama service
+ollama serve
 
-3. **Function Not Found**
-   ```typescript
-   // Refresh function discovery
-   await aiNodeFactory.discoverFunctions();
-   ```
-
-### Debug Mode
-
-```typescript
-// Enable debug logging
-localStorage.setItem('ai-debug', 'true');
-
-// View API calls in console
-// Check browser network tab for AI requests
+# Test connection
+curl http://localhost:11434/api/tags
 ```
 
-## 📈 Performance Optimization
+**API Key Issues:**
+- Verify API keys are correctly set in `.env`
+- Check provider dashboards for key validity
+- Ensure sufficient API credits/quota
 
-### Caching
+**Build Errors:**
+```bash
+# Clear node modules and reinstall
+rm -rf node_modules package-lock.json
+npm install
 
-- Function schemas are cached for 1 hour
-- Node metadata is cached in memory
-- API responses are cached where appropriate
-
-### Batch Processing
-
-```typescript
-// Execute multiple AI functions in batch
-const batchResult = await apiClient.callBatchAIFunctions([
-  { function: 'text.generate', parameters: { prompt: 'Hello' } },
-  { function: 'text.sentiment', parameters: { text: 'Hello' } }
-]);
+# Clear Vite cache
+rm -rf dist .vite
+npm run build
 ```
 
-### Connection Pooling
+### Performance Optimization
 
-- HTTP/2 connections are reused
-- WebSocket connections for streaming are pooled
-- Automatic connection health monitoring
-
-## 🔒 Security Considerations
-
-### Input Validation
-
-- All inputs are validated against JSON schemas
-- Malicious prompts are filtered
-- File uploads are scanned for malware
-
-### Output Sanitization
-
-- Generated content is sanitized
-- URLs are validated
-- Sensitive data is redacted
-
-### Audit Logging
-
-- All AI function calls are logged
-- Usage patterns are monitored
-- Anomalous behavior triggers alerts
+1. **Use Ollama for Development**: Faster iteration, no API costs
+2. **Batch Requests**: Group multiple AI operations when possible
+3. **Choose Appropriate Models**: Smaller models for simple tasks
+4. **Monitor Response Times**: Switch providers if experiencing slowdowns
 
 ## 📚 API Reference
 
-### Core Methods
-
-- `aiNodeFactory.discoverFunctions()`: Get available functions
-- `aiNodeFactory.createNode()`: Create AI node instance
-- `node.execute()`: Execute AI function
-- `apiClient.callAIFunction()`: Direct API call
-
-### Events
+### AI Service Methods
 
 ```typescript
-// Listen for AI events
-window.addEventListener('ai-usage', (event) => {
-  console.log('AI Usage:', event.detail);
-});
+// Provider management
+aiSDKService.setProvider('ollama')
+aiSDKService.getAvailableProviders()
+aiSDKService.isOllamaAvailable()
 
-window.addEventListener('ai-error', (event) => {
-  console.error('AI Error:', event.detail);
-});
+// Cost tracking
+aiSDKService.getCostSummary()
+aiSDKService.resetCostTracking()
+
+// AI operations
+aiSDKService.generateWorkflowSuggestion(context)
+aiSDKService.optimizeWorkflow(workflow)
+aiSDKService.chatWithAI(message)
 ```
 
-## 🤝 Contributing
-
-### Adding New AI Node Types
-
-1. Create node class implementing `StudioNode`
-2. Add property definitions for the node
-3. Implement execute method with error handling
-4. Register with `AINodeFactory`
-5. Add tests and documentation
-
-### Testing AI Nodes
+### Configuration API
 
 ```typescript
-// Mock AI responses for testing
-jest.mock('../services/api', () => ({
-  apiClient: {
-    callAIFunction: jest.fn().mockResolvedValue({
-      result: { text: 'Mock response' },
-      metadata: { cost_usd: 0.01 }
-    })
-  }
-}));
+// Feature checks
+aiSDKService.isAIFeaturesEnabled()
+aiSDKService.isCostTrackingEnabled()
+aiSDKService.isHealthCheckEnabled()
+
+// Provider info
+aiSDKService.getDefaultProvider()
+aiSDKService.getAvailableProviders()
 ```
 
-## 📞 Support
+## 🎉 Benefits
 
-- **Documentation**: https://docs.auterity.com/ai-integration
-- **API Reference**: https://api.auterity.com/docs
-- **Issues**: Create GitHub issue in auterity-workflow-studio
-- **Security**: security@auterity.com
+### Cost Savings
+- **$0 Development Costs**: Use Ollama for all development work
+- **Smart Provider Selection**: Automatically choose cost-effective providers
+- **Usage Tracking**: Monitor and optimize AI spending
+
+### Productivity Gains
+- **Intelligent Suggestions**: AI-powered workflow optimization
+- **Real-time Help**: Instant AI assistance while building workflows
+- **Context Awareness**: AI understands your current work
+
+### Flexibility
+- **Multi-Provider**: Never locked into one AI provider
+- **Local Processing**: Work offline with Ollama
+- **Scalable**: Seamlessly scale from development to production
+
+## 🔄 Next Steps
+
+This implementation represents **Phase 1** of the AI integration. Future phases will include:
+
+- **Phase 2**: Vector database integration (Chroma, Qdrant)
+- **Phase 3**: Advanced ML model training and deployment
+- **Phase 4**: Automated workflow generation from natural language
+- **Phase 5**: Collaborative AI features and team optimization
 
 ---
 
-This AI integration provides a robust, scalable, and user-friendly way to incorporate AI capabilities into workflow automation, with comprehensive error handling, performance optimization, and security measures.
+For questions or issues, please refer to the troubleshooting section or create an issue in the repository.

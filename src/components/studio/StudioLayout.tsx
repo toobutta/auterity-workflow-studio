@@ -16,6 +16,7 @@ const SimulationManager = lazy(() => import('../SimulationManager.js').then(modu
 const Toolbar = lazy(() => import('../toolbar/Toolbar.js').then(module => ({ default: module.Toolbar })));
 const Minimap = lazy(() => import('../minimap/Minimap.js').then(module => ({ default: module.Minimap })));
 const PerformanceMonitor = lazy(() => import('../PerformanceMonitor.js').then(module => ({ default: module.PerformanceMonitor })));
+const AIDashboard = lazy(() => import('../ai/AIDashboard.js').then(module => ({ default: module.AIDashboard })));
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ name: string }> = ({ name }) => (
@@ -184,6 +185,23 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({ onLogout }) => {
                   collapsed={state.panels.properties.collapsed}
                   onResize={(width) => handlePanelResize('properties', width)}
                   onToggleCollapse={() => actions.togglePanel('properties')}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {/* AI Dashboard Panel */}
+          {state.panels.aiDashboard.visible && (
+            <div
+              className="studio-right-panel"
+              style={{ width: state.panels.aiDashboard.width }}
+            >
+              <Suspense fallback={<LoadingFallback name="AI Dashboard" />}>
+                <AIDashboard
+                  width={state.panels.aiDashboard.width}
+                  collapsed={state.panels.aiDashboard.collapsed}
+                  onResize={(width) => handlePanelResize('aiDashboard', width)}
+                  onToggleCollapse={() => actions.togglePanel('aiDashboard')}
                 />
               </Suspense>
             </div>

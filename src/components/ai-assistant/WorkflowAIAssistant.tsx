@@ -25,6 +25,7 @@ import {
 import './WorkflowAIAssistant.css';
 import './WorkflowAIAssistantExplainability.css';
 import { getConfidenceIcon } from '../../utils/professionalIcons.js';
+import { aiSDKService } from '../../services/aiSDKService.js';
 
 // Enhanced interfaces for workflow AI integration
 interface WorkflowAIMessage {
@@ -335,10 +336,7 @@ What would you like to work on today?`,
     setIsProcessing(true);
 
     try {
-      // Simulate AI processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Generate contextual AI response
+      // Generate contextual AI response using AI SDK
       const aiResponse = await generateAIResponse(input, userMessage.workflowContext);
       
       setMessages(prev => [...prev, aiResponse]);
@@ -361,135 +359,76 @@ What would you like to work on today?`,
     }
   }, [workflowId, currentNode, canvasState]);
 
-  // Generate AI response based on input and context
+  // Generate AI response based on input and context using AI SDK
   const generateAIResponse = async (input: string, context?: any): Promise<WorkflowAIMessage> => {
+    try {
+      // Use AI SDK for generating responses
+      const response = await aiSDKService.generateTextResponse(input, context);
+
+      return {
+        id: `ai_${Date.now()}`,
+        type: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        workflowContext: context,
+        suggestions: generateContextualSuggestions(input, response)
+      };
+    } catch (error) {
+      console.error('AI SDK response generation failed:', error);
+
+      // Fallback to basic response
+      return {
+        id: `ai_${Date.now()}`,
+        type: 'assistant',
+        content: `I understand you want to: "${input}". I'm here to help you with workflow creation, optimization, and management. Could you provide more details about what you'd like to accomplish?`,
+        timestamp: new Date(),
+        workflowContext: context
+      };
+    }
+  };
+
+  // Generate contextual suggestions based on input and response
+  const generateContextualSuggestions = (input: string, response: string): WorkflowSuggestion[] => {
     const lowerInput = input.toLowerCase();
+    const suggestions: WorkflowSuggestion[] = [];
 
-    // Workflow creation requests
-    if (lowerInput.includes('create') || lowerInput.includes('build') || lowerInput.includes('generate')) {
-      if (lowerInput.includes('workflow')) {
-        return {
-          id: `ai_${Date.now()}`,
-          type: 'assistant',
-          content: `I'll help you create a workflow! Based on your request "${input}", I can suggest:
-
-1. **Start with a template** - Choose from our library of pre-built workflows
-2. **Build from scratch** - I'll guide you step-by-step
-3. **Generate automatically** - Describe what you want and I'll create it
-
-Which approach would you prefer? Or would you like me to suggest some relevant templates?`,
-          timestamp: new Date(),
-          workflowContext: context,
-          suggestions: [
-            {
-              id: 'template_suggestion',
-              type: 'template',
-              title: 'Customer Onboarding Template',
-              description: 'Pre-built workflow for customer onboarding process',
-              confidence: 0.9,
-              action: { type: 'apply_template', data: { templateId: 'customer_onboarding' } },
-              preview: 'Includes email verification, profile setup, and welcome sequence'
-            }
-          ]
-        };
-      }
+    if (lowerInput.includes('create') || lowerInput.includes('build') || lowerInput.includes('workflow')) {
+      suggestions.push({
+        id: 'template_suggestion',
+        type: 'template',
+        title: 'Customer Onboarding Template',
+        description: 'Pre-built workflow for customer onboarding process',
+        confidence: 0.9,
+        action: { type: 'apply_template', data: { templateId: 'customer_onboarding' } },
+        preview: 'Includes email verification, profile setup, and welcome sequence'
+      });
     }
 
-    // Query building requests
     if (lowerInput.includes('query') || lowerInput.includes('database') || lowerInput.includes('sql')) {
-      return {
-        id: `ai_${Date.now()}`,
-        type: 'assistant',
-        content: `I can help you build database queries! Here are some options:
-
-**Visual Query Builder** - Use our no-code interface to build queries
-**Natural Language** - Describe what data you need and I'll generate the SQL
-**Query Templates** - Choose from common query patterns
-
-What kind of data are you looking for? For example:
-- "Show me all customers who signed up last month"
-- "Find orders with status 'pending' over $100"
-- "Get product sales by category"`,
-        timestamp: new Date(),
-        workflowContext: context,
-        suggestions: [
-          {
-            id: 'query_builder',
-            type: 'query',
-            title: 'Open Query Builder',
-            description: 'Launch the visual query builder interface',
-            confidence: 0.95,
-            action: { type: 'create_query', data: { openBuilder: true } },
-            preview: 'Visual drag-and-drop query building interface'
-          }
-        ]
-      };
+      suggestions.push({
+        id: 'query_builder',
+        type: 'query',
+        title: 'Open Query Builder',
+        description: 'Launch the visual query builder interface',
+        confidence: 0.95,
+        action: { type: 'create_query', data: { openBuilder: true } },
+        preview: 'Visual drag-and-drop query building interface'
+      });
     }
 
-    // Optimization requests
     if (lowerInput.includes('optimize') || lowerInput.includes('improve') || lowerInput.includes('faster')) {
-      return {
-        id: `ai_${Date.now()}`,
-        type: 'assistant',
-        content: `I've analyzed your workflow and found several optimization opportunities:
-
-**Performance Issues Detected:**
-- Multiple sequential database queries (can be batched)
-- Missing parallel execution opportunities
-- Inefficient data processing steps
-
-**Recommended Improvements:**
-1. **Batch Database Operations** - Reduce query count by 70%
-2. **Enable Parallel Processing** - Cut execution time by 30%
-3. **Add Caching Layer** - Improve response time for repeated operations
-
-Would you like me to apply these optimizations automatically?`,
-        timestamp: new Date(),
-        workflowContext: context,
-        suggestions: [
-          {
-            id: 'auto_optimize',
-            type: 'optimization',
-            title: 'Auto-Optimize Workflow',
-            description: 'Apply all recommended optimizations automatically',
-            confidence: 0.87,
-            action: { type: 'optimize_workflow', data: { applyAll: true } },
-            preview: 'Estimated 50% performance improvement'
-          }
-        ]
-      };
+      suggestions.push({
+        id: 'optimization_suggestion',
+        type: 'optimization',
+        title: 'Auto-Optimize Workflow',
+        description: 'Apply AI-driven optimizations to improve performance',
+        confidence: 0.87,
+        action: { type: 'optimize_workflow', data: { optimizationType: 'comprehensive' } },
+        preview: 'Reduces execution time and improves resource utilization'
+      });
     }
 
-    // General help or unclear requests
-    return {
-      id: `ai_${Date.now()}`,
-      type: 'assistant',
-      content: `I understand you're asking about "${input}". Here's how I can help:
-
-**Workflow Building**
-- Create new workflows from templates or scratch
-- Add nodes, connections, and configure properties
-- Generate workflows from natural language descriptions
-
-**Data & Queries**
-- Build SQL queries with visual interface
-- Connect to databases and APIs
-- Transform and process data
-
-**Optimization**
-- Analyze workflow performance
-- Suggest improvements and bottleneck fixes
-- Implement best practices automatically
-
-**Smart Suggestions**
-- Context-aware recommendations
-- Error prevention and handling
-- Industry-specific templates
-
-What specific aspect would you like help with?`,
-      timestamp: new Date(),
-      workflowContext: context
-    };
+    return suggestions;
   };
 
   // Handle suggestion application
@@ -576,7 +515,7 @@ What specific aspect would you like help with?`,
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="expand-button"
-              aria-expanded={isExpanded.toString()}
+              aria-expanded={isExpanded}
             >
               <span>{isExpanded ? 'Hide' : 'Show'} details</span>
               <ChevronDownIcon className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />

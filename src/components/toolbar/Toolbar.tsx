@@ -14,7 +14,8 @@ import {
   MinusIcon,
   PlusIcon,
   ViewfinderCircleIcon,
-  BugAntIcon
+  BugAntIcon,
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 import './Toolbar.css';
 
@@ -254,6 +255,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ className = '' }) => {
         >
           <BugAntIcon className="w-4 h-4" />
           <span className="tool-label">Debug</span>
+        </button>
+        
+        <button
+          className={`toolbar-button ${state.panels.aiDashboard.visible ? 'active' : ''}`}
+          onClick={() => actions.togglePanel('aiDashboard')}
+          title="Toggle AI Dashboard"
+        >
+          <CpuChipIcon className="w-4 h-4" />
+          <span className="tool-label">AI</span>
         </button>
       </div>
 

@@ -32,6 +32,7 @@ const initialState: StudioState = {
     minimap: { visible: true, width: 200, height: 150 },
     toolbar: { visible: true, position: 'top' },
     debug: { visible: false, width: 400, collapsed: false },
+    aiDashboard: { visible: true, width: 380, collapsed: false, position: 'right' },
   },
   theme: LIGHT_THEME,
   auth: initialAuthState,
