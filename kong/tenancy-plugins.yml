@@ -1,0 +1,369 @@
+---
+# Kong Tenancy Plugins Configuration
+# This file defines plugins for tenancy context propagation
+
+# ============================================================================
+# TENANCY VALIDATION PLUGIN
+# ============================================================================
+
+plugins:
+  - name: tenancy-validator
+    service: workflow-engine
+    config:
+      required_headers:
+        - "X-Organization-Id"
+        - "X-Workspace-Id"
+        - "X-User-Id"
+      validate_format: true
+      organization_pattern: "^org_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      workspace_pattern: "^ws_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      project_pattern: "^proj_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      user_pattern: "^user_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      error_response: |
+        {
+          "error": {
+            "code": "INVALID_TENANCY_CONTEXT",
+            "message": "Missing or invalid tenancy headers",
+            "required_headers": ["X-Organization-Id", "X-Workspace-Id", "X-User-Id"]
+          }
+        }
+
+# ============================================================================
+# TENANCY PROPAGATION PLUGIN
+# ============================================================================
+
+  - name: tenancy-propagator
+    config:
+      # Add tenancy context to all requests
+      add_headers:
+        - "X-Organization-Id:$(headers['x-organization-id'] || 'default')"
+        - "X-Workspace-Id:$(headers['x-workspace-id'] || 'default')"
+        - "X-Project-Id:$(headers['x-project-id'] || 'default')"
+        - "X-Environment-Id:$(headers['x-environment-id'] || 'default')"
+        - "X-User-Id:$(headers['x-user-id'] || 'default')"
+        - "X-Request-Id:$(headers['x-request-id'] || crypto.randomUUID())"
+        - "X-Timestamp:$(os.date('%Y-%m-%dT%H:%M:%SZ'))"
+
+      # Propagate JWT claims as headers
+      jwt_claims_as_headers:
+        - "X-User-Roles:$(jwt.claims.roles)"
+        - "X-Organization-Role:$(jwt.claims.org_role)"
+        - "X-Workspace-Role:$(jwt.claims.workspace_role)"
+        - "X-Project-Role:$(jwt.claims.project_role)"
+
+# ============================================================================
+# TENANCY-BASED RATE LIMITING
+# ============================================================================
+
+  - name: tenancy-rate-limit
+    service: workflow-engine
+    config:
+      # Rate limits per organization
+      limits:
+        organization:
+          minute: 10000
+          hour: 100000
+        workspace:
+          minute: 1000
+          hour: 10000
+        project:
+          minute: 100
+          hour: 1000
+
+      # Redis configuration for distributed rate limiting
+      redis:
+        host: ${REDIS_HOST}
+        port: ${REDIS_PORT}
+        password: ${REDIS_PASSWORD}
+        database: 2
+
+      # Custom key generation based on tenancy
+      key_generator: |
+        local org_id = kong.request.get_header("X-Organization-Id")
+        local ws_id = kong.request.get_header("X-Workspace-Id")
+        local proj_id = kong.request.get_header("X-Project-Id")
+        local user_id = kong.request.get_header("X-User-Id")
+        local endpoint = kong.request.get_path()
+
+        -- Generate hierarchical keys for different scopes
+        return {
+          organization = org_id,
+          workspace = org_id .. ":" .. ws_id,
+          project = org_id .. ":" .. ws_id .. ":" .. proj_id,
+          user = org_id .. ":" .. user_id,
+          endpoint = org_id .. ":" .. endpoint
+        }
+
+# ============================================================================
+# TENANCY-AWARE ACL PLUGIN
+# ============================================================================
+
+  - name: tenancy-acl
+    service: workflow-engine
+    config:
+      # ACL groups based on tenancy and roles
+      groups:
+        - "org-admin:$(headers['X-Organization-Role'] == 'admin')"
+        - "workspace-admin:$(headers['X-Workspace-Role'] == 'admin')"
+        - "project-owner:$(headers['X-Project-Role'] == 'owner')"
+        - "studio-user:$(headers['X-User-Roles'] ~= 'studio')"
+        - "ai-user:$(headers['X-User-Roles'] ~= 'ai')"
+
+      # Deny by default
+      deny_all: true
+
+      # Allow rules
+      allow:
+        - "org-admin"
+        - "workspace-admin"
+        - "project-owner"
+        - "studio-user"
+        - "ai-user"
+
+# ============================================================================
+# TENANCY LOGGING PLUGIN
+# ============================================================================
+
+  - name: tenancy-log
+    config:
+      # Structured logging with tenancy context
+      log_format: json
+      include_tenancy: true
+      include_request_body: false
+      include_response_body: false
+
+      # Custom log fields
+      custom_fields:
+        - "organization_id:$(headers['X-Organization-Id'])"
+        - "workspace_id:$(headers['X-Workspace-Id'])"
+        - "project_id:$(headers['X-Project-Id'])"
+        - "environment_id:$(headers['X-Environment-Id'])"
+        - "user_id:$(headers['X-User-Id'])"
+        - "request_id:$(headers['X-Request-Id'])"
+        - "user_roles:$(headers['X-User-Roles'])"
+
+      # Log to multiple destinations
+      destinations:
+        - type: http
+          url: ${LOGGING_ENDPOINT}/api/v1/logs
+          method: POST
+          headers:
+            - "Authorization:Bearer ${LOGGING_TOKEN}"
+            - "Content-Type:application/json"
+
+        - type: file
+          path: /var/log/kong/tenancy.log
+          rotate: daily
+          max_size: 100MB
+
+# ============================================================================
+# TENANCY CACHE PLUGIN
+# ============================================================================
+
+  - name: tenancy-cache
+    service: workflow-engine
+    config:
+      # Cache based on tenancy context
+      cache_ttl: 300  # 5 minutes
+      cache_key_generator: |
+        local org_id = kong.request.get_header("X-Organization-Id")
+        local ws_id = kong.request.get_header("X-Workspace-Id")
+        local proj_id = kong.request.get_header("X-Project-Id")
+        local method = kong.request.get_method()
+        local path = kong.request.get_path()
+
+        return org_id .. ":" .. ws_id .. ":" .. proj_id .. ":" .. method .. ":" .. path
+
+      # Redis cache store
+      redis:
+        host: ${REDIS_HOST}
+        port: ${REDIS_PORT}
+        password: ${REDIS_PASSWORD}
+        database: 3
+
+# ============================================================================
+# TENANCY METRICS PLUGIN
+# ============================================================================
+
+  - name: tenancy-metrics
+    config:
+      # Prometheus metrics with tenancy labels
+      metrics:
+        - name: kong_http_requests_total
+          type: counter
+          labels:
+            - "organization_id:$(headers['X-Organization-Id'])"
+            - "workspace_id:$(headers['X-Workspace-Id'])"
+            - "project_id:$(headers['X-Project-Id'])"
+            - "user_id:$(headers['X-User-Id'])"
+
+        - name: kong_request_duration_seconds
+          type: histogram
+          buckets: [0.1, 0.5, 1, 2, 5, 10]
+          labels:
+            - "organization_id:$(headers['X-Organization-Id'])"
+            - "workspace_id:$(headers['X-Workspace-Id'])"
+
+        - name: kong_tenancy_errors_total
+          type: counter
+          labels:
+            - "organization_id:$(headers['X-Organization-Id'])"
+            - "error_type:$(ctx.error_type)"
+
+# ============================================================================
+# TENANCY REQUEST TRANSFORMATION
+# ============================================================================
+
+  - name: request-transformer
+    service: workflow-engine
+    config:
+      # Transform requests based on tenancy
+      add:
+        querystring:
+          - "organization_id:$(headers['X-Organization-Id'])"
+          - "workspace_id:$(headers['X-Workspace-Id'])"
+          - "project_id:$(headers['X-Project-Id'])"
+          - "user_id:$(headers['X-User-Id'])"
+
+      # Add tenancy context to request body for POST/PUT requests
+      add_body:
+        - "tenancy.organization_id:$(headers['X-Organization-Id'])"
+        - "tenancy.workspace_id:$(headers['X-Workspace-Id'])"
+        - "tenancy.project_id:$(headers['X-Project-Id'])"
+        - "tenancy.user_id:$(headers['X-User-Id'])"
+        - "tenancy.request_id:$(headers['X-Request-Id'])"
+
+# ============================================================================
+# TENANCY RESPONSE TRANSFORMATION
+# ============================================================================
+
+  - name: response-transformer
+    service: workflow-engine
+    config:
+      # Add tenancy context to all responses
+      add:
+        headers:
+          - "X-API-Version:v1"
+          - "X-Organization-Id:$(headers['X-Organization-Id'])"
+          - "X-Workspace-Id:$(headers['X-Workspace-Id'])"
+          - "X-Project-Id:$(headers['X-Project-Id'])"
+          - "X-Request-Id:$(headers['X-Request-Id'])"
+
+# ============================================================================
+# WORKSPACE/PROJECT ISOLATION PLUGIN
+# ============================================================================
+
+  - name: tenancy-isolation
+    service: workflow-engine
+    config:
+      # Ensure users can only access resources in their workspaces/projects
+      isolation_rules:
+        - pattern: "/api/v1/workspaces/(?<workspace_id>[^/]+).*"
+          validate: "$(headers['X-Workspace-Id']) == workspace_id"
+          error_message: "Access denied: workspace mismatch"
+
+        - pattern: "/api/v1/projects/(?<project_id>[^/]+).*"
+          validate: "$(headers['X-Project-Id']) == project_id"
+          error_message: "Access denied: project mismatch"
+
+        - pattern: "/api/v1/workflows/(?<workflow_id>[^/]+).*"
+          validate: "check_workflow_access(workflow_id, $(headers['X-Workspace-Id']), $(headers['X-User-Id']))"
+          error_message: "Access denied: insufficient workflow permissions"
+
+# ============================================================================
+# TENANCY QUOTA ENFORCEMENT PLUGIN
+# ============================================================================
+
+  - name: tenancy-quota
+    service: workflow-engine
+    config:
+      # Quota limits per tenancy level
+      quotas:
+        organization:
+          api_calls_per_hour: 100000
+          storage_gb: 100
+          active_users: 1000
+
+        workspace:
+          api_calls_per_hour: 10000
+          workflows: 1000
+          executions_per_month: 50000
+
+        project:
+          api_calls_per_hour: 1000
+          environments: 5
+          deployments_per_month: 300
+
+      # Redis for quota tracking
+      redis:
+        host: ${REDIS_HOST}
+        port: ${REDIS_PORT}
+        password: ${REDIS_PASSWORD}
+        database: 4
+
+      # Quota exceeded response
+      quota_exceeded_response: |
+        {
+          "error": {
+            "code": "QUOTA_EXCEEDED",
+            "message": "Usage quota exceeded",
+            "tenancy_context": {
+              "organization_id": "$(headers['X-Organization-Id'])",
+              "workspace_id": "$(headers['X-Workspace-Id'])",
+              "project_id": "$(headers['X-Project-Id'])"
+            },
+            "retry_after_seconds": 3600
+          }
+        }
+
+# ============================================================================
+# TENANCY AUDIT PLUGIN
+# ============================================================================
+
+  - name: tenancy-audit
+    config:
+      # Audit all API calls with tenancy context
+      audit_events:
+        - "api_call"
+        - "authentication"
+        - "authorization"
+        - "resource_access"
+        - "configuration_change"
+
+      # Audit log destination
+      audit_log:
+        type: http
+        url: ${AUDIT_ENDPOINT}/api/v1/audit
+        method: POST
+        headers:
+          - "Authorization:Bearer ${AUDIT_TOKEN}"
+          - "Content-Type:application/json"
+
+      # Sensitive data masking
+      mask_fields:
+        - "password"
+        - "secret"
+        - "token"
+        - "key"
+        - "authorization"
+
+      # Audit record structure
+      audit_record_template: |
+        {
+          "id": "$(uuid())",
+          "timestamp": "$(os.date('%Y-%m-%dT%H:%M:%SZ'))",
+          "event_type": "$(event_type)",
+          "user_id": "$(headers['X-User-Id'])",
+          "organization_id": "$(headers['X-Organization-Id'])",
+          "workspace_id": "$(headers['X-Workspace-Id'])",
+          "project_id": "$(headers['X-Project-Id'])",
+          "request_id": "$(headers['X-Request-Id'])",
+          "method": "$(request.get_method())",
+          "path": "$(request.get_path())",
+          "status_code": "$(response.get_status())",
+          "user_agent": "$(headers['User-Agent'])",
+          "ip_address": "$(request.get_forwarded_ip())",
+          "request_body_size": "$(request.get_body_size())",
+          "response_body_size": "$(response.get_body_size())",
+          "processing_time_ms": "$(ctx.KONG_PROCESSING_TIME)"
+        }

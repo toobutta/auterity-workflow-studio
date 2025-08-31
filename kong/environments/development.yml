@@ -1,0 +1,51 @@
+---
+# Development Environment Configuration
+# Relaxed security for local development
+
+# Override rate limits for development
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 10000  # Higher limits for development
+      hour: 100000
+      policy: local
+
+  - name: rate-limiting
+    service: ai-hub
+    config:
+      minute: 1000  # Higher AI call limits for development
+      hour: 10000
+      policy: local
+
+# Development CORS settings
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
+        - http://localhost:3001
+        - https://studio-dev.auterity.com
+        - https://*.auterity.dev
+      credentials: true
+
+# Development logging
+  - name: file-log
+    config:
+      path: /var/log/kong/studio-dev.log
+      reopen: true
+
+# Disable some security headers in development
+  - name: response-transformer
+    config:
+      replace:
+        headers:
+          - "Content-Security-Policy:default-src 'self' 'unsafe-inline' 'unsafe-eval' localhost:3000 localhost:3001"
+
+# Development health checks (more frequent)
+upstreams:
+  - name: workflow-engine-upstream
+    healthchecks:
+      active:
+        healthy:
+          interval: 10  # Check every 10 seconds in dev
+        unhealthy:
+          interval: 5   # Check unhealthy services more frequently

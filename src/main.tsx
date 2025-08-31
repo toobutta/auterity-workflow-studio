@@ -1,10 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import ImportPage from './pages/ImportPage.js'
+import { BrowserRouter } from 'react-router-dom'
+import WorkflowStudioApp from './components/WorkflowStudioApp'
+import './WorkflowStudioStyles.css'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ImportPage />
+    <BrowserRouter>
+      <WorkflowStudioApp />
+    </BrowserRouter>
   </React.StrictMode>,
 )

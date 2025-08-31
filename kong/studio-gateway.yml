@@ -1,0 +1,351 @@
+---
+# Kong Gateway Configuration for Workflow Studio APIs
+# This configuration should be deployed to the auterity-error-iq/kong/ directory
+
+# ============================================================================
+# SERVICES - Backend API Endpoints
+# ============================================================================
+
+services:
+  # Workflow Engine Service
+  - name: workflow-engine
+    url: http://backend:8000  # Internal backend service
+    routes:
+      - name: workflow-engine-routes
+        paths:
+          - /api/v1/workflows
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        strip_path: false
+
+  # AI Hub Service
+  - name: ai-hub
+    url: http://ai-hub:8001  # Internal AI Hub service
+    routes:
+      - name: ai-hub-routes
+        paths:
+          - /api/v1/ai
+        methods: ["GET", "POST"]
+        strip_path: false
+
+  # Authentication Service
+  - name: auth-service
+    url: http://auth-service:8002  # Internal auth service
+    routes:
+      - name: auth-service-routes
+        paths:
+          - /api/v1/auth
+        methods: ["GET", "POST", "PUT"]
+        strip_path: false
+
+# ============================================================================
+# UPSTREAMS - Load Balancing and Health Checks
+# ============================================================================
+
+upstreams:
+  - name: workflow-engine-upstream
+    targets:
+      - target: backend:8000
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 5
+        concurrency: 10
+        healthy:
+          interval: 30
+          success: 2
+          http_status: [200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 307, 308]
+        unhealthy:
+          interval: 30
+          timeout: 5
+          http_failures: 3
+          tcp_failures: 3
+
+  - name: ai-hub-upstream
+    targets:
+      - target: ai-hub:8001
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 5
+        concurrency: 10
+
+# ============================================================================
+# PLUGINS - Authentication, Authorization, and Security
+# ============================================================================
+
+plugins:
+  # Global Plugins
+  - name: cors
+    config:
+      origins:
+        - https://studio.auterity.com
+        - https://*.auterity.com
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      headers: ["Accept", "Accept-Version", "Content-Length", "Content-MD5", "Content-Type", "Date", "X-Auth-Token", "Authorization"]
+      exposed_headers: ["X-Auth-Token"]
+      credentials: true
+      max_age: 3600
+
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10485760  # 10MB
+
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      policy: local
+
+  # Studio-Specific Plugins
+  - name: jwt
+    service: workflow-engine
+    config:
+      claims_to_verify: ["exp", "nbf"]
+      key_claim_name: "kid"
+      maximum_expiration: 86400  # 24 hours
+      run_on_preflight: false
+
+  - name: key-auth
+    service: workflow-engine
+    config:
+      key_names: ["apikey", "X-API-Key"]
+      run_on_preflight: false
+
+  - name: acl
+    service: workflow-engine
+    config:
+      allow: ["studio-users", "admin"]
+      hide_groups_header: true
+
+  # AI Hub Plugins
+  - name: jwt
+    service: ai-hub
+    config:
+      claims_to_verify: ["exp", "nbf", "aud"]
+      audience: ["ai-hub"]
+      key_claim_name: "kid"
+      maximum_expiration: 3600  # 1 hour for AI calls
+
+  - name: rate-limiting
+    service: ai-hub
+    config:
+      minute: 60  # AI calls per minute
+      hour: 1000
+      policy: local
+
+  - name: request-transformer
+    service: ai-hub
+    config:
+      add:
+        headers:
+          - "X-Requested-With:WorkflowStudio"
+          - "X-Client-Version:1.0.0"
+
+# ============================================================================
+# CONSUMERS - API Consumers and Their Permissions
+# ============================================================================
+
+consumers:
+  - username: workflow-studio
+    custom_id: studio-client
+    tags: ["studio", "frontend"]
+
+  - username: studio-admin
+    custom_id: studio-admin
+    tags: ["studio", "admin"]
+
+# ACL Groups
+acls:
+  - consumer: workflow-studio
+    group: studio-users
+
+  - consumer: studio-admin
+    group: admin
+    group: studio-users
+
+# JWT Credentials
+jwt_secrets:
+  - consumer: workflow-studio
+    key: studio-jwt-key
+    secret: studio-jwt-secret
+    algorithm: HS256
+
+  - consumer: studio-admin
+    key: admin-jwt-key
+    secret: admin-jwt-secret
+    algorithm: HS256
+
+# API Keys
+keyauth_credentials:
+  - consumer: workflow-studio
+    key: studio-api-key
+
+  - consumer: studio-admin
+    key: admin-api-key
+
+# ============================================================================
+# ROUTE-SPECIFIC PLUGINS - Granular Security Controls
+# ============================================================================
+
+# Workflow Management Routes
+plugins:
+  - name: request-validator
+    route: workflow-engine-routes
+    config:
+      body_schema: |
+        {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "minLength": 1, "maxLength": 100},
+            "description": {"type": "string", "maxLength": 500},
+            "nodes": {"type": "array", "maxItems": 1000},
+            "edges": {"type": "array", "maxItems": 2000},
+            "metadata": {"type": "object"}
+          },
+          "required": ["name", "nodes", "edges"]
+        }
+
+  - name: response-transformer
+    route: workflow-engine-routes
+    config:
+      add:
+        headers:
+          - "X-API-Version: v1"
+          - "X-Service: workflow-engine"
+
+# AI Function Calling Routes
+  - name: request-validator
+    service: ai-hub
+    route: ai-hub-routes
+    config:
+      body_schema: |
+        {
+          "type": "object",
+          "properties": {
+            "function": {"type": "string", "minLength": 1, "maxLength": 100},
+            "parameters": {"type": "object"},
+            "timeout": {"type": "integer", "minimum": 1, "maximum": 300}
+          },
+          "required": ["function"]
+        }
+
+  - name: response-ratelimiting
+    service: ai-hub
+    route: ai-hub-routes
+    config:
+      limits:
+        minute: 10
+        hour: 100
+
+# ============================================================================
+# TENANCY PLUGINS - Workspace/Project Context
+# ============================================================================
+
+plugins:
+  - name: request-transformer
+    service: workflow-engine
+    config:
+      add:
+        headers:
+          - "X-Workspace-Id:$(headers['x-workspace-id'] || 'default')"
+          - "X-Project-Id:$(headers['x-project-id'] || 'default')"
+          - "X-Environment:$(headers['x-environment'] || 'dev')"
+
+  - name: request-transformer
+    service: ai-hub
+    config:
+      add:
+        headers:
+          - "X-Workspace-Id:$(headers['x-workspace-id'] || 'default')"
+          - "X-Project-Id:$(headers['x-project-id'] || 'default')"
+          - "X-Environment:$(headers['x-environment'] || 'dev')"
+
+# ============================================================================
+# MONITORING AND LOGGING
+# ============================================================================
+
+plugins:
+  # Global Monitoring
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+  - name: file-log
+    config:
+      path: /var/log/kong/studio.log
+      reopen: true
+
+  # Request/Response Logging
+  - name: http-log
+    config:
+      http_endpoint: http://monitoring:8080/api/v1/logs
+      method: POST
+      timeout: 1000
+      keepalive: 1000
+      retry_count: 3
+      queue:
+        size: 1000
+        flush_timeout: 2
+
+# ============================================================================
+# SECURITY HEADERS
+# ============================================================================
+
+plugins:
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options:nosniff"
+          - "X-Frame-Options:DENY"
+          - "X-XSS-Protection:1; mode=block"
+          - "Strict-Transport-Security:max-age=31536000; includeSubDomains"
+          - "Content-Security-Policy:default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'"
+
+# ============================================================================
+# CERTIFICATES AND TLS
+# ============================================================================
+
+certificates:
+  - cert: |
+      -----BEGIN CERTIFICATE-----
+      # Studio SSL Certificate would go here
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      # Private key would go here
+      -----END PRIVATE KEY-----
+    snis:
+      - studio.auterity.com
+      - api.studio.auterity.com
+
+# ============================================================================
+# HEALTH CHECKS AND MONITORING
+# ============================================================================
+
+plugins:
+  - name: healthcheck
+    config:
+      checks:
+        active:
+          type: http
+          http_path: /health
+          timeout: 5
+          concurrency: 10
+          healthy:
+            interval: 30
+            success: 2
+            http_status: [200, 201]
+          unhealthy:
+            interval: 30
+            timeout: 5
+            http_failures: 3
+            tcp_failures: 3

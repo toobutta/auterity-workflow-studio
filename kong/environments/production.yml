@@ -1,0 +1,140 @@
+---
+# Production Environment Configuration
+# Strict security and performance optimizations
+
+# Stricter rate limits for production
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      day: 50000
+      policy: redis
+      redis:
+        host: redis-cluster
+        port: 6379
+        password: ${REDIS_PASSWORD}
+        database: 1
+
+  - name: rate-limiting
+    service: ai-hub
+    config:
+      minute: 60   # Strict AI call limits
+      hour: 1000
+      day: 5000
+      policy: redis
+      redis:
+        host: redis-cluster
+        port: 6379
+        password: ${REDIS_PASSWORD}
+        database: 2
+
+# Production CORS settings (strict)
+  - name: cors
+    config:
+      origins:
+        - https://studio.auterity.com
+        - https://*.auterity.com
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      headers: ["Accept", "Accept-Version", "Content-Length", "Content-MD5", "Content-Type", "Date", "X-Auth-Token", "Authorization"]
+      credentials: true
+      max_age: 86400  # 24 hours
+
+# Enhanced security headers
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options:nosniff"
+          - "X-Frame-Options:DENY"
+          - "X-XSS-Protection:1; mode=block"
+          - "Strict-Transport-Security:max-age=31536000; includeSubDomains; preload"
+          - "Content-Security-Policy:default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.auterity.com wss://api.auterity.com"
+          - "Referrer-Policy:strict-origin-when-cross-origin"
+          - "Permissions-Policy:geolocation=(), microphone=(), camera=()"
+
+# Production logging (structured)
+  - name: http-log
+    config:
+      http_endpoint: https://logs.auterity.com/api/v1/kong
+      method: POST
+      timeout: 5000
+      keepalive: 60000
+      retry_count: 5
+      queue:
+        size: 10000
+        flush_timeout: 10
+      headers:
+        - "Authorization:Bearer ${LOGGING_TOKEN}"
+        - "X-Environment:production"
+
+# Circuit breaker for upstream services
+  - name: circuit-breaker
+    service: workflow-engine
+    config:
+      failure_threshold: 0.5
+      recovery_timeout: 60
+      monitoring_period: 60
+
+  - name: circuit-breaker
+    service: ai-hub
+    config:
+      failure_threshold: 0.3
+      recovery_timeout: 120
+      monitoring_period: 60
+
+# Request/response size limits (stricter)
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 5242880  # 5MB for production
+
+# Production upstream configuration
+upstreams:
+  - name: workflow-engine-upstream
+    targets:
+      - target: workflow-engine-1:8000
+        weight: 100
+      - target: workflow-engine-2:8000
+        weight: 100
+      - target: workflow-engine-3:8000
+        weight: 100
+    hash_on: header
+    hash_fallback: ip
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 2
+        concurrency: 20
+        healthy:
+          interval: 10
+          success: 3
+          http_status: [200]
+        unhealthy:
+          interval: 5
+          timeout: 2
+          http_failures: 2
+          tcp_failures: 2
+
+  - name: ai-hub-upstream
+    targets:
+      - target: ai-hub-1:8001
+        weight: 100
+      - target: ai-hub-2:8001
+        weight: 100
+    hash_on: header
+    hash_fallback: ip
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        timeout: 2
+        concurrency: 20
+
+# Production certificates (would be managed separately)
+# certificates:
+#   - cert: ${SSL_CERT_PROD}
+#     key: ${SSL_KEY_PROD}
+#     snis:
+#       - studio.auterity.com
+#       - api.studio.auterity.com
