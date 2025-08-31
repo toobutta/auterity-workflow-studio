@@ -40,12 +40,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Start API server (background)
-        run: |
-          cd ../auterity-error-iq/apps/api
-          npm ci
-          npm run dev &
-          sleep 5
-        
       - name: Run integration tests
         run: npm test src/__tests__/api.test.ts
