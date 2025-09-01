@@ -1,0 +1,618 @@
+---
+name: CodeRabbit Backend Issue Automation
+
+on:
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  coderabbit-automation:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event.comment && contains(github.event.comment.body, '@coderabbitai')) ||
+      (github.event.review && github.event.review.user.login == 'coderabbitai[bot]') ||
+      (github.event.comment && github.event.comment.user.login == 'coderabbitai[bot]')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract CodeRabbit feedback
+        id: extract-feedback
+        run: |
+          echo "Extracting CodeRabbit feedback..."
+          
+          # Use the dedicated CodeRabbit parser script
+          cat > analyze_feedback.js << 'EOF'
+          const fs = require('fs');
+          
+          // Get the event data
+          const eventName = process.env.GITHUB_EVENT_NAME;
+          const eventPath = process.env.GITHUB_EVENT_PATH;
+          const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+          
+          let feedbackText = '';
+          let issueTypes = [];
+          
+          // Extract feedback based on event type
+          if (eventName === 'issue_comment') {
+            feedbackText = event.comment.body;
+          } else if (eventName === 'pull_request_review') {
+            feedbackText = event.review.body || '';
+          } else if (eventName === 'pull_request_review_comment') {
+            feedbackText = event.comment.body;
+          }
+          
+          console.log('Feedback text:', feedbackText);
+          
+          // Analyze feedback for backend issues
+          const backendIssuePatterns = {
+            'missing-imports': /missing import|import.*not found|cannot find module/i,
+            'type-annotations': /type annotation|missing type|type.*missing|typescript.*error/i,
+            'code-style': /code style|formatting|linting|eslint|prettier/i,
+            'security-vulnerabilities': /security.*vulnerability|security.*issue|cve-|security.*risk/i,
+            'performance-issues': /performance.*issue|slow.*query|inefficient|optimization.*needed/i,
+            'async-await': /async.*await|promise.*chain|callback.*hell/i,
+            'error-handling': /error.*handling|try.*catch|exception.*handling|error.*not.*handled/i,
+            'null-undefined': /null.*check|undefined.*check|nullable|optional.*chaining/i,
+            'memory-leaks': /memory.*leak|circular.*reference|cleanup.*needed/i,
+            'api-design': /api.*design|rest.*api|endpoint.*design|http.*status/i
+          };
+          
+          for (const [type, pattern] of Object.entries(backendIssuePatterns)) {
+            if (pattern.test(feedbackText)) {
+              issueTypes.push(type);
+            }
+          }
+          
+          console.log('Detected issue types:', issueTypes);
+          
+          // Set outputs
+          console.log(`::set-output name=feedback::${feedbackText}`);
+          console.log(`::set-output name=issue_types::${issueTypes.join(',')}`);
+          console.log(`::set-output name=has_backend_issues::${issueTypes.length > 0}`);
+          EOF
+          
+          # Use the dedicated parser if available, otherwise use the inline script
+          if [ -f scripts/coderabbit-parser.cjs ]; then
+            node scripts/coderabbit-parser.cjs "$feedbackText" > feedback_analysis.json
+            cat feedback_analysis.json
+            feedback=$(cat feedback_analysis.json | jq -r '.issues | map(.type) | join(",")')
+            has_issues=$(cat feedback_analysis.json | jq -r '.hasBackendIssues')
+            echo "::set-output name=feedback::$feedbackText"
+            echo "::set-output name=issue_types::$feedback"
+            echo "::set-output name=has_backend_issues::$has_issues"
+          else
+            node analyze_feedback.js
+          fi
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+
+      - name: Analyze codebase for issues
+        id: analyze-code
+        if: steps.extract-feedback.outputs.has_backend_issues == 'true'
+        run: |
+          echo "Analyzing codebase for backend issues..."
+          
+          # Use the dedicated backend analyzer script
+          if [ -f scripts/backend-analyzer.cjs ]; then
+            echo "Using dedicated backend analyzer..."
+            node scripts/backend-analyzer.cjs src analyze > code_analysis.json
+            cat code_analysis.json
+            issues_count=$(cat code_analysis.json | jq -r '.totalIssues')
+            echo "::set-output name=issues_found::$issues_count"
+          else
+            echo "Using inline code analysis..."
+            # Create code analysis script
+            cat > analyze_code.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          
+          function analyzeFile(filePath) {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const issues = [];
+            
+            // Check for missing imports
+            const importRegex = /from\s+['"`]([^'"`]+)['"`]/g;
+            const usageRegex = /\b([A-Z][a-zA-Z0-9]*)\b/g;
+            
+            let match;
+            const imports = new Set();
+            while ((match = importRegex.exec(content)) !== null) {
+              imports.add(match[1]);
+            }
+            
+            // Check for type annotation issues
+            if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+              if (content.includes('any') && !content.includes('// @ts-ignore')) {
+                issues.push({
+                  type: 'type-annotations',
+                  message: 'Found usage of "any" type which should be avoided',
+                  file: filePath,
+                  fix: 'Replace "any" with specific types'
+                });
+              }
+              
+              if (/function\s+\w+\([^)]*\)\s*{/.test(content)) {
+                issues.push({
+                  type: 'type-annotations',
+                  message: 'Function missing return type annotation',
+                  file: filePath,
+                  fix: 'Add return type annotations to functions'
+                });
+              }
+            }
+            
+            // Check for error handling
+            if (content.includes('async') && !content.includes('try') && !content.includes('catch')) {
+              issues.push({
+                type: 'error-handling',
+                message: 'Async function without error handling',
+                file: filePath,
+                fix: 'Add try-catch blocks around async operations'
+              });
+            }
+            
+            // Check for null/undefined checks
+            if (/\.\w+/.test(content) && !content.includes('?.') && !content.includes('&&')) {
+              issues.push({
+                type: 'null-undefined',
+                message: 'Potential null/undefined access without checks',
+                file: filePath,
+                fix: 'Use optional chaining (?.) or null checks'
+              });
+            }
+            
+            return issues;
+          }
+          
+          function findBackendFiles(dir) {
+            const files = [];
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+                files.push(...findBackendFiles(fullPath));
+              } else if (entry.isFile() && /\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+                files.push(fullPath);
+              }
+            }
+            
+            return files;
+          }
+          
+          const backendFiles = findBackendFiles('./src');
+          const allIssues = [];
+          
+          for (const file of backendFiles) {
+            const issues = analyzeFile(file);
+            allIssues.push(...issues);
+          }
+          
+          console.log('Found issues:', JSON.stringify(allIssues, null, 2));
+          
+          fs.writeFileSync('code_issues.json', JSON.stringify(allIssues, null, 2));
+          console.log(`::set-output name=issues_found::${allIssues.length}`);
+          EOF
+          
+          node analyze_code.js
+          fi
+
+      - name: Generate automated fixes
+        id: generate-fixes
+        if: steps.analyze-code.outputs.issues_found > 0
+        run: |
+          echo "Generating automated fixes..."
+          
+          # Use the dedicated backend analyzer for automated fixes
+          if [ -f scripts/backend-analyzer.cjs ]; then
+            echo "Using dedicated backend analyzer for fixes..."
+            
+            # Get the issue types from previous analysis
+            if [ -f code_analysis.json ]; then
+              # Extract issue types and apply fixes
+              node -e "
+                const analysis = require('./code_analysis.json');
+                const issueTypes = Object.keys(analysis.issuesByType);
+                console.log('Detected issue types:', issueTypes.join(', '));
+                
+                // Apply fixes using the backend analyzer
+                const { execSync } = require('child_process');
+                try {
+                  const result = execSync('node scripts/backend-analyzer.cjs src fix', { encoding: 'utf8' });
+                  const fixes = JSON.parse(result);
+                  console.log('Fix results:', JSON.stringify(fixes, null, 2));
+                  require('fs').writeFileSync('applied_fixes.json', JSON.stringify(fixes, null, 2));
+                  console.log(\`::set-output name=fixes_applied::\${fixes.totalChanges || 0}\`);
+                } catch (error) {
+                  console.error('Error applying fixes:', error.message);
+                  console.log('::set-output name=fixes_applied::0');
+                }
+              "
+            else
+              echo "No analysis file found, falling back to inline script"
+              # Create fix generation script
+              cat > generate_fixes.js << 'EOF'
+          const fs = require('fs');
+          
+          const issues = JSON.parse(fs.readFileSync('code_issues.json', 'utf8'));
+          const fixes = [];
+          
+          for (const issue of issues) {
+            const filePath = issue.file;
+            let content = fs.readFileSync(filePath, 'utf8');
+            let fixed = false;
+            
+            switch (issue.type) {
+              case 'type-annotations':
+                if (content.includes(': any')) {
+                  content = content.replace(/: any/g, ': unknown');
+                  fixed = true;
+                }
+                if (/function\s+(\w+)\s*\([^)]*\)\s*{/.test(content)) {
+                  content = content.replace(
+                    /function\s+(\w+)\s*\(([^)]*)\)\s*{/g,
+                    'function $1($2): void {'
+                  );
+                  fixed = true;
+                }
+                break;
+                
+              case 'error-handling':
+                if (content.includes('async') && !content.includes('try')) {
+                  // Simple try-catch wrapper for async functions
+                  content = content.replace(
+                    /(async\s+function\s+\w+[^{]*{)([\s\S]*?)(}\s*$)/gm,
+                    '$1\n  try {\n$2\n  } catch (error) {\n    console.error("Error:", error);\n    throw error;\n  }\n$3'
+                  );
+                  fixed = true;
+                }
+                break;
+                
+              case 'null-undefined':
+                // Add basic null checks
+                content = content.replace(
+                  /(\w+)\.(\w+)/g,
+                  '$1?.$2'
+                );
+                fixed = true;
+                break;
+                
+              case 'missing-imports':
+                // Add common missing imports
+                if (content.includes('React') && !content.includes("import React")) {
+                  content = "import React from 'react';\n" + content;
+                  fixed = true;
+                }
+                break;
+            }
+            
+            if (fixed) {
+              fs.writeFileSync(filePath, content);
+              fixes.push({
+                file: filePath,
+                type: issue.type,
+                message: issue.message
+              });
+            }
+          }
+          
+          console.log('Applied fixes:', JSON.stringify(fixes, null, 2));
+          fs.writeFileSync('applied_fixes.json', JSON.stringify(fixes, null, 2));
+          console.log(`::set-output name=fixes_applied::${fixes.length}`);
+          EOF
+          
+          node generate_fixes.js
+          fi
+
+      - name: Run comprehensive validation
+        id: validation
+        if: steps.generate-fixes.outputs.fixes_applied > 0
+        run: |
+          echo "Running comprehensive validation..."
+          
+          # Use the dedicated validator if available
+          if [ -f scripts/fix-validator.cjs ]; then
+            node scripts/fix-validator.cjs
+          else
+            echo "Running basic validation..."
+            
+            # Check if build still works
+            if npm run build; then
+              echo "::set-output name=build_success::true"
+            else
+              echo "::set-output name=build_success::false"
+            fi
+            
+            # Run tests if they exist
+            if npm test -- --run 2>/dev/null; then
+              echo "::set-output name=tests_pass::true"
+            else
+              echo "::set-output name=tests_pass::false"
+            fi
+            
+            # Basic validation success if build passes
+            if [ "$build_success" = "true" ]; then
+              echo "::set-output name=validation_success::true"
+            else
+              echo "::set-output name=validation_success::false"
+            fi
+          fi
+
+      - name: Lint fixed code
+        if: steps.generate-fixes.outputs.fixes_applied > 0
+        run: |
+          # Run ESLint if available
+          if [ -f .eslintrc.js ] || [ -f .eslintrc.json ] || [ -f eslint.config.js ]; then
+            npx eslint src --fix --ext .ts,.tsx,.js,.jsx || true
+          fi
+          
+          # Run Prettier if available
+          if [ -f .prettierrc ] || [ -f prettier.config.js ]; then
+            npx prettier --write "src/**/*.{ts,tsx,js,jsx}" || true
+          fi
+
+      - name: Commit automated fixes
+        if: steps.generate-fixes.outputs.fixes_applied > 0 && steps.validation.outputs.validation_success == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "CodeRabbit Automation"
+          
+          git add -A
+          
+          # Create commit message
+          if [ -f applied_fixes.json ]; then
+            fixes_summary=$(node -e "
+              const fixes = require('./applied_fixes.json');
+              const types = [...new Set(fixes.map(f => f.type))];
+              console.log('fix: automated CodeRabbit backend issue resolution');
+              console.log('');
+              console.log('Resolved issues:');
+              types.forEach(type => {
+                const count = fixes.filter(f => f.type === type).length;
+                console.log(\`- \${type}: \${count} fixes\`);
+              });
+              console.log('');
+              console.log('Files modified:');
+              fixes.forEach(fix => console.log(\`- \${fix.file}\`));
+            ")
+            
+            git commit -m "$fixes_summary" || echo "No changes to commit"
+          else
+            git commit -m "fix: automated CodeRabbit backend issue resolution" || echo "No changes to commit"
+          fi
+
+      - name: Push changes
+        if: steps.generate-fixes.outputs.fixes_applied > 0 && steps.validation.outputs.validation_success == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.head_ref || github.ref }}
+
+      - name: Update PR with resolution summary
+        if: steps.generate-fixes.outputs.fixes_applied > 0
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let summary = '## 🤖 Automated CodeRabbit Issue Resolution\n\n';
+            
+            const validationSuccess = '${{ steps.validation.outputs.validation_success }}' === 'true';
+            
+            if (fs.existsSync('applied_fixes.json')) {
+              const fixes = JSON.parse(fs.readFileSync('applied_fixes.json', 'utf8'));
+              
+              if (validationSuccess) {
+                summary += `✅ **${fixes.length || fixes.totalChanges || 0} backend issues automatically resolved**\n\n`;
+              } else {
+                summary += `⚠️ **Fixes applied but validation failed**\n\n`;
+                summary += `${fixes.length || fixes.totalChanges || 0} backend issues were processed, but some validation checks failed.\n\n`;
+              }
+              
+              // Add fix details if available
+              if (fixes.fixesByType) {
+                for (const [type, count] of Object.entries(fixes.fixesByType)) {
+                  summary += `### ${type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n`;
+                  summary += `Fixed ${count} issue(s)\n\n`;
+                }
+              } else if (Array.isArray(fixes)) {
+                const groupedFixes = fixes.reduce((acc, fix) => {
+                  if (!acc[fix.type]) acc[fix.type] = [];
+                  acc[fix.type].push(fix);
+                  return acc;
+                }, {});
+                
+                for (const [type, typeFixes] of Object.entries(groupedFixes)) {
+                  summary += `### ${type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n`;
+                  summary += `Fixed ${typeFixes.length} issue(s):\n`;
+                  typeFixes.forEach(fix => {
+                    summary += `- ${fix.file}: ${fix.message}\n`;
+                  });
+                  summary += '\n';
+                }
+              }
+              
+              summary += '### Quality Assurance\n';
+              summary += `- Build Status: ${'${{ steps.validation.outputs.build_success }}' === 'true' ? '✅ Success' : '❌ Failed'}\n`;
+              summary += `- Tests Status: ${'${{ steps.validation.outputs.tests_pass }}' === 'true' ? '✅ Pass' : '❌ Fail'}\n`;
+              summary += `- Validation: ${validationSuccess ? '✅ Success' : '❌ Failed'}\n\n`;
+              
+              // Add validation report if available
+              if (fs.existsSync('validation_report.md')) {
+                const validationReport = fs.readFileSync('validation_report.md', 'utf8');
+                summary += validationReport;
+              } else {
+                summary += '---\n';
+                summary += '*This resolution was automatically generated by the CodeRabbit Backend Automation workflow.*';
+              }
+            }
+            
+            // Post comment on PR
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: summary
+              });
+            }
+
+      - name: Handle workflow failures
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## ⚠️ CodeRabbit Automation Issue
+            
+            The automated CodeRabbit backend issue resolution workflow encountered an error.
+            
+            **Workflow Status:** Failed
+            **Event:** ${{ github.event_name }}
+            **Trigger:** CodeRabbit feedback detection
+            
+            Please review the workflow logs and consider manual intervention for the reported issues.
+            
+            ---
+            *This notification was automatically generated by the CodeRabbit Backend Automation workflow.*`;
+            
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: summary
+              });
+            }
+
+  # Security and validation job
+  security-validation:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event.comment && contains(github.event.comment.body, '@coderabbitai')) ||
+      (github.event.review && github.event.review.user.login == 'coderabbitai[bot]') ||
+      (github.event.comment && github.event.comment.user.login == 'coderabbitai[bot]')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        continue-on-error: true
+        run: |
+          npm audit --audit-level moderate || true
+          npm audit fix --dry-run || true
+
+      - name: Check for sensitive data
+        run: |
+          echo "Scanning for potential sensitive data..."
+          
+          # Check for common secrets patterns
+          if grep -r -i "password\|secret\|key\|token" src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" | grep -v "// TODO\|// FIXME"; then
+            echo "⚠️ Potential sensitive data found in source code"
+          else
+            echo "✅ No obvious sensitive data patterns found"
+          fi
+
+      - name: Validate TypeScript types
+        run: |
+          if command -v tsc &> /dev/null; then
+            npx tsc --noEmit --skipLibCheck
+          else
+            echo "TypeScript compiler not available, skipping type check"
+          fi
+
+      - name: Performance impact assessment
+        run: |
+          echo "Assessing potential performance impact of changes..."
+          
+          # Check for performance anti-patterns
+          cat > check_performance.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          
+          function checkFile(filePath) {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const issues = [];
+            
+            // Check for performance issues
+            if (content.includes('document.querySelector') && content.includes('loop')) {
+              issues.push('DOM queries in loops detected');
+            }
+            
+            if (content.includes('JSON.parse') && content.includes('JSON.stringify')) {
+              issues.push('Potential unnecessary JSON serialization');
+            }
+            
+            if (content.includes('setInterval') && !content.includes('clearInterval')) {
+              issues.push('setInterval without cleanup');
+            }
+            
+            return issues;
+          }
+          
+          function findFiles(dir) {
+            const files = [];
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+                files.push(...findFiles(fullPath));
+              } else if (entry.isFile() && /\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+                files.push(fullPath);
+              }
+            }
+            
+            return files;
+          }
+          
+          const files = findFiles('./src');
+          let totalIssues = 0;
+          
+          for (const file of files) {
+            const issues = checkFile(file);
+            if (issues.length > 0) {
+              console.log(`${file}:`);
+              issues.forEach(issue => console.log(`  - ${issue}`));
+              totalIssues += issues.length;
+            }
+          }
+          
+          console.log(`\nTotal performance concerns: ${totalIssues}`);
+          EOF
+          
+          node check_performance.js
