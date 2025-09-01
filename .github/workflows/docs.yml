@@ -1,0 +1,128 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-git-committers-plugin-2 mkdocs-minify-plugin
+
+      - name: Build documentation
+        run: mkdocs build --clean
+
+      - name: Check links
+        run: |
+          pip install linkchecker
+          linkchecker site/ --check-extern --no-warnings --ignore-url="^mailto:" --ignore-url="^tel:" --ignore-url="javascript:" || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs-build
+          path: site/
+          retention-days: 7
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: docs-build
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          cname: docs.auterity.com
+
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-git-committers-plugin-2 mkdocs-minify-plugin
+
+      - name: Validate MkDocs configuration
+        run: mkdocs build --strict --clean
+
+      - name: Check for broken internal links
+        run: |
+          python -c "
+          import os
+          import re
+          from pathlib import Path
+
+          docs_dir = Path('docs')
+          broken_links = []
+
+          for md_file in docs_dir.rglob('*.md'):
+              with open(md_file, 'r', encoding='utf-8') as f:
+                  content = f.read()
+
+              # Find relative links
+              links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', content)
+              for link_text, link_url in links:
+                  if link_url.startswith('./') or link_url.startswith('../') or (not link_url.startswith('http') and not link_url.startswith('#')):
+                      # Remove fragment identifiers
+                      clean_url = link_url.split('#')[0]
+                      if clean_url and not clean_url.endswith('/') and '.' not in clean_url.split('/')[-1]:
+                          clean_url += '.md'
+
+                      # Resolve relative path
+                      full_path = (md_file.parent / clean_url).resolve()
+
+                      # Check if file exists
+                      if not full_path.exists() and not clean_url.startswith('http'):
+                          broken_links.append(f'{md_file}: {link_url}')
+
+          if broken_links:
+              print('Broken internal links found:')
+              for link in broken_links:
+                  print(f'  {link}')
+              exit(1)
+          else:
+              print('No broken internal links found.')
+          "

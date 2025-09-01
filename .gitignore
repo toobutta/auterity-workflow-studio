@@ -4,3 +4,28 @@ dist
 *.log
 .DS_Store
 coverage
+
+# Vite build output
+build/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# OS generated files
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Testing
+test-results/
+playwright-report/
+
+# Package-lock for consistency
+package-lock.json

@@ -204,6 +204,12 @@ export interface PanelState {
     width: number;
     collapsed: boolean;
   };
+  aiDashboard: {
+    visible: boolean;
+    width: number;
+    collapsed: boolean;
+    position: 'right' | 'bottom';
+  };
 }
 
 // Theme Types

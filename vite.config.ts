@@ -2,120 +2,170 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 
+// Enhanced Vite configuration for optimized builds
 export default defineConfig({
   plugins: [
-    react(),
-    // Bundle analyzer - only enabled when ANALYZE=true
-    ...(process.env.ANALYZE === 'true' ? [visualizer({
-      filename: 'dist/bundle-analysis.html',
-      open: true,
-      gzipSize: true,
-      brotliSize: true,
-    })] : [])
+    react({
+      // Enable React Fast Refresh
+      fastRefresh: true,
+      // Enable JSX runtime
+      jsxRuntime: 'automatic'
+    }),
+
+    // Bundle analyzer (only in analyze mode)
+    ...(process.env.ANALYZE ? [
+      visualizer({
+        filename: 'dist/stats.html',
+        open: true,
+        gzipSize: true,
+        brotliSize: true
+      })
+    ] : [])
   ],
+
+  // Enhanced build configuration
+  build: {
+    // Output configuration
+    outDir: 'dist',
+    assetsDir: 'assets',
+
+    // Code splitting and optimization
+    rollupOptions: {
+      output: {
+        // Manual chunks for better caching
+        manualChunks: {
+          // React and core libraries
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+
+          // UI libraries
+          'ui-vendor': ['framer-motion', 'pixi.js', 'yjs', 'y-webrtc'],
+
+          // AI and ML libraries
+          'ai-vendor': ['ai', '@ai-sdk/openai', '@ai-sdk/anthropic', '@ai-sdk/google'],
+
+          // Data visualization
+          'viz-vendor': ['d3', 'recharts', 'react-window'],
+
+          // Utilities
+          'utils-vendor': ['zod', 'immer', 'zustand', 'date-fns']
+        },
+
+        // Optimize chunk names
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    },
+
+    // Optimization settings
+    minify: 'esbuild',
+    sourcemap: process.env.NODE_ENV === 'development',
+
+    // Bundle size limits
+    chunkSizeWarningLimit: 1000,
+
+    // Target modern browsers for better performance
+    target: 'esnext',
+
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+
+    // Report compressed size
+    reportCompressedSize: true
+  },
+
+  // Enhanced development server
   server: {
-    port: 5173,
+    host: 'localhost',
+    port: 3000,
     open: true,
-    // Enable HMR with better performance
+
+    // Proxy configuration for API calls
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      }
+    },
+
+    // Hot Module Replacement (HMR)
     hmr: {
       overlay: true
     }
   },
-  build: {
-    // Optimize build output
-    target: 'esnext',
-    minify: 'esbuild',
-    cssMinify: true,
-    sourcemap: process.env.NODE_ENV === 'development',
 
-    rollupOptions: {
-      output: {
-        // Intelligent chunk splitting for better caching
-        manualChunks: (id) => {
-          // Vendor libraries
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            if (id.includes('pixi.js')) {
-              return 'pixi-vendor';
-            }
-            if (id.includes('zustand') || id.includes('immer')) {
-              return 'state-vendor';
-            }
-            if (id.includes('zod') || id.includes('date-fns')) {
-              return 'utils-vendor';
-            }
-            if (id.includes('@headlessui') || id.includes('framer-motion')) {
-              return 'ui-vendor';
-            }
-            // Other node_modules go to vendor
-            return 'vendor';
-          }
-
-          // Application code chunks
-          if (id.includes('/src/hooks/')) {
-            return 'hooks';
-          }
-          if (id.includes('/src/utils/')) {
-            return 'utils';
-          }
-          if (id.includes('/src/components/')) {
-            return 'components';
-          }
-          if (id.includes('/src/services/')) {
-            return 'services';
-          }
-        },
-
-        // Optimize asset naming for better caching
-        assetFileNames: (assetInfo) => {
-          if (!assetInfo.name) return `assets/[name]-[hash][extname]`;
-
-          const info = assetInfo.name.split('.');
-          const extType = info[info.length - 1];
-          if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
-            return `assets/images/[name]-[hash][extname]`;
-          }
-          if (/\.(css)$/i.test(assetInfo.name)) {
-            return `assets/css/[name]-[hash][extname]`;
-          }
-          return `assets/[name]-[hash][extname]`;
-        },
-
-        chunkFileNames: 'assets/js/[name]-[hash].js',
-        entryFileNames: 'assets/js/[name]-[hash].js',
-      },
-
-      // External dependencies that shouldn't be bundled
-      external: []
-    },
-
-    // Performance optimizations
-    chunkSizeWarningLimit: 1000,
-    reportCompressedSize: false, // Disabled for faster builds
-  },
-
-  // Dependency optimization
+  // Enhanced dependency optimization
   optimizeDeps: {
+    // Pre-bundle these dependencies for faster dev server startup
     include: [
       'react',
       'react-dom',
-      'zustand',
-      'immer',
-      'zod',
-      'date-fns',
-      'clsx'
+      'react-router-dom',
+      'framer-motion',
+      'pixi.js',
+      '@ai-sdk/openai',
+      '@ai-sdk/anthropic',
+      'zod'
     ],
-    exclude: []
+
+    // Exclude these from pre-bundling (they might cause issues)
+    exclude: [
+      'ollama' // Dynamic import
+    ]
   },
 
-  // Environment variables
-  envPrefix: 'VITE_',
+  // Enhanced resolve configuration
+  resolve: {
+    alias: {
+      '@': '/src',
+      '@components': '/src/components',
+      '@services': '/src/services',
+      '@hooks': '/src/hooks',
+      '@utils': '/src/utils',
+      '@types': '/src/types',
+      '@pages': '/src/pages',
+      '@enhanced': '/src/services/enhanced'
+    }
+  },
 
-  // Preview server configuration
+  // Enhanced CSS configuration
+  css: {
+    devSourcemap: true,
+    modules: {
+      localsConvention: 'camelCase'
+    },
+    preprocessorOptions: {
+      scss: {
+        additionalData: '@import "@/styles/variables.scss";'
+      }
+    }
+  },
+
+  // Enhanced testing configuration
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+
+    // Coverage configuration
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/coverage/**'
+      ]
+    }
+  },
+
+  // Enhanced preview configuration
   preview: {
-    port: 4173,
+    host: 'localhost',
+    port: 3001,
     open: true
   }
 })

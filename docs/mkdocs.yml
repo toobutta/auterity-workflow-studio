@@ -1,0 +1,211 @@
+site_name: Auterity Documentation Hub
+site_url: https://docs.auterity.com
+site_description: Complete documentation suite for Auterity's workflow automation and AI processing platform
+site_author: Auterity Documentation Team
+
+# Repository
+repo_name: auterity/workflow-studio
+repo_url: https://github.com/auterity/workflow-studio
+edit_uri: edit/main/docs/
+
+# Theme Configuration
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.footnote.tooltips
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - toc.integrate
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - git-committers:
+      repository: auterity/workflow-studio
+      branch: main
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - meta
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: auterity
+      repo: workflow-studio
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - tables
+  - toc:
+      permalink: true
+
+# Navigation Structure
+nav:
+  - Home: index.md
+  - Overview: overview.md
+  - Getting Started:
+      - Quick Start: customer/getting-started.md
+      - First Workflow: customer/tutorials/first-workflow.md
+      - AI Integration: customer/tutorials/ai-integration.md
+  - System Documentation:
+      - Architecture: system/architecture.md
+      - API Reference: system/api-contracts.md
+      - Components:
+          - Workflow Studio: system/components/workflow-studio.md
+          - AutoMatrix Core: system/components/automatrix-core.md
+          - AI Services: system/components/ai-services.md
+      - Data Models: system/data-model.md
+      - DevOps: system/devops.md
+      - Observability: system/observability.md
+      - Testing: system/testing.md
+  - Product Features:
+      - Workflow Builder: product/features/workflow-builder.md
+      - AI Automation: product/features/ai-automation.md
+      - Template Library: product/features/template-library.md
+      - Analytics Dashboard: product/features/analytics-dashboard.md
+      - Collaboration: product/features/collaboration.md
+      - Marketplace: product/features/marketplace.md
+      - Roadmap: product/roadmap.md
+      - KPIs: product/kpis.md
+  - Marketing & Sales:
+      - Messaging: marketing/messaging.md
+      - Features to Benefits: marketing/features-to-benefits.md
+      - Website Copy: marketing/website-copy.md
+      - Pitch Deck: marketing/pitchdeck-support.md
+  - IT & Operations:
+      - Deployment: it/deployment.md
+      - Security Policies: it/security-policies.md
+      - Runbooks: it/runbooks.md
+      - Access Policies: it/access-policies.md
+      - Security Checklist: it/security-checklist.md
+      - License Compliance: it/license.md
+  - Customer Success:
+      - Getting Started: customer/getting-started.md
+      - Tutorials:
+          - First Workflow: customer/tutorials/first-workflow.md
+          - AI Integration: customer/tutorials/ai-integration.md
+      - Integrations: customer/integrations.md
+      - API Examples: customer/api-examples.md
+      - Troubleshooting: customer/troubleshooting.md
+  - Frontend Documentation:
+      - Component Architecture: frontend/component-map.md
+      - Design System: frontend/design-tokens.md
+      - Page Flows: frontend/page-flows.md
+      - Accessibility: frontend/accessibility.md
+      - Storybook: frontend/storybook-links.md
+  - Reference:
+      - Glossary: glossary.md
+      - Data Dictionary: data-dictionary.md
+      - Analytics Events: analytics-events.md
+      - KPIs Dashboard: kpis-dashboard.md
+      - Contributing: contributing.md
+  - Templates:
+      - Overview: templates/README.md
+      - PRD Template: templates/prd-template.md
+      - API Documentation: templates/api-doc-template.md
+      - User Guide: templates/user-guide-template.md
+      - Runbook: templates/runbook-template.md
+      - FAQ: templates/faq-template.md
+
+# Additional Configuration
+extra:
+  version:
+    provider: mike
+    default: latest
+
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/auterity/workflow-studio
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/auterity
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/company/auterity
+
+  analytics:
+    provider: google
+    property: UA-XXXXXXXXX-X
+
+# Customization
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
